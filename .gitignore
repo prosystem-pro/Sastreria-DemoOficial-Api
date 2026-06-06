@@ -1,0 +1,31 @@
+# 🔹 Archivos de SQL Server (Bases de datos locales)
+*.mdf
+*.ldf
+*.ndf
+*.bak
+*.sqlproj.user
+*.dbmdl
+*.jfm
+
+# 🔹 Angular (archivos generados y dependencias)
+node_modules/
+dist/
+coverage/
+.angular/
+.vscode/
+*.log
+
+# 🔹 Node.js y Express (dependencias, logs y configuración)
+npm-debug.log
+yarn-error.log
+.env
+sql-ts.config.json
+
+# 🔹 Visual Studio y .NET (archivos temporales y compilación)
+bin/
+obj/
+.vs/
+*.suo
+*.user
+*.userosscache
+*.sln.docstates

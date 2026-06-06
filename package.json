@@ -1,0 +1,36 @@
+{
+  "name": "carritoweb-api",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js",
+    "dev": "nodemon index.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "description": "",
+  "dependencies": {
+    "bcryptjs": "^3.0.2",
+    "cors": "^2.8.5",
+    "date-fns-tz": "^3.2.0",
+    "dotenv": "^16.4.7",
+    "express": "^4.21.2",
+    "firebase-admin": "^13.1.0",
+    "googleapis": "^173.0.0",
+    "jsonwebtoken": "^9.0.2",
+    "luxon": "^3.6.1",
+    "moment": "^2.30.1",
+    "multer": "^1.4.5-lts.1",
+    "node-cron": "^4.2.1",
+    "pdfkit": "^0.18.0",
+    "sequelize": "^6.37.5",
+    "sequelize-auto": "^0.8.8",
+    "sequelize-cli": "^6.6.2",
+    "tedious": "^18.6.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.1.9"
+  }
+}
