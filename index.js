@@ -15,7 +15,7 @@ const { DateTime } = require('luxon');
 const PORT = process.env.PORT || 1433;
 
 
-cron.schedule('*/1 * * * *', async () => {
+cron.schedule('0 5 * * *', async () => {
   
   try {
     const { contenidoSQL, nombreArchivo } = await ServicioBackup.RespaldoCompleto();
