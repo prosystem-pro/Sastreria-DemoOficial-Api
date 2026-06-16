@@ -587,6 +587,12 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
         if (!CodigoPedido)
             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
 
+        const aproximarSegunRegla = (valor) => {
+            if (!valor || isNaN(valor)) return 0;
+            const entero = Math.floor(valor);
+            const decimales = valor - entero;
+            return (decimales * 100 >= 51) ? entero + 1 : entero;
+        };
 
         // ================= EMPRESA =================
         const empresa = await EmpresaModelo.findOne({
@@ -837,9 +843,12 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
 
         totalesY += 15;
 
-        const descuentoValor = (pedido.Subtotal * pedido.Descuento) / 100;
 
-        doc.text('Descuento:', xLabel, totalesY);
+        const descuentoBruto = (pedido.Subtotal * pedido.Descuento) / 100;
+        const descuentoValor = aproximarSegunRegla(descuentoBruto);
+
+        doc.text(`Descuento (${pedido.Descuento}%):`, xLabel, totalesY);
+
         doc.text(`Q ${descuentoValor.toFixed(2)}`, xMonto, totalesY, { width: anchoMonto, align: 'right' });
 
         totalesY += 15;
@@ -1358,7 +1367,6 @@ const RegistrarPagoPedido = async (datos, usuario) => {
         throw error;
     }
 };
-//aqui estamos
 const ObtenerPedido = async (CodigoPedido) => {
     try {
 
@@ -1582,7 +1590,6 @@ const ObtenerPedido = async (CodigoPedido) => {
             Productos: productos
         };
 
-
         return respuesta;
 
     } catch (error) {
@@ -1595,132 +1602,6 @@ const ObtenerPedido = async (CodigoPedido) => {
         throw error;
     }
 };
-// const EliminarPedido = async (CodigoPedido) => {
-
-//     const transaccion = await BaseDatos.transaction();
-
-//     try {
-
-//         if (!CodigoPedido)
-//             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
-
-//         const pedido = await PedidoModelo.findOne({
-//             where: { CodigoPedido },
-//             transaction: transaccion
-//         });
-
-//         if (!pedido)
-//             LanzarError('El pedido no existe', 404, 'Advertencia');
-
-//         const detalles = await PedidoDetalleModelo.findAll({
-//             where: { CodigoPedido },
-//             transaction: transaccion
-//         });
-
-//         for (const detalle of detalles) {
-
-//             const inventario = await InventarioModelo.findOne({
-//                 where: {
-//                     CodigoInventario: detalle.CodigoInventario
-//                 },
-//                 transaction: transaccion,
-//                 lock: true
-//             });
-
-//             if (inventario) {
-
-//                 const stockAnterior = inventario.StockActual;
-//                 const stockNuevo = stockAnterior + detalle.Cantidad;
-
-//                 await inventario.update({
-//                     StockActual: stockNuevo
-//                 }, { transaction: transaccion });
-
-//                 // ================= MOVIMIENTO INVENTARIO =================
-//                 await MovimientoInventarioModelo.create({
-
-//                     CodigoEmpresa: 1,
-//                     CodigoInventario: inventario.CodigoInventario,
-//                     CodigoUsuario: pedido.CodigoUsuario,
-
-//                     TipoMovimiento: 'ENTRADA',
-//                     OrigenMovimiento: 'ELIMINACION_PEDIDO',
-
-//                     TipoDocumento: 'PEDIDO',
-//                     CodigoDocumento: CodigoPedido,
-
-//                     Cantidad: detalle.Cantidad,
-
-//                     StockAnterior: stockAnterior,
-//                     StockNuevo: stockNuevo,
-
-//                     FechaMovimiento: new Date(),
-//                     Observacion: `Entrada por eliminación pedido ${CodigoPedido}`,
-
-//                     Estatus: 1,
-//                     FechaCreacion: new Date()
-
-//                 }, { transaction: transaccion });
-//             }
-
-//             await PedidoDetalleMedidaModelo.destroy({
-//                 where: {
-//                     CodigoPedidoDetalle: detalle.CodigoPedidoDetalle
-//                 },
-//                 transaction: transaccion
-//             });
-
-//             await detalle.destroy({
-//                 transaction: transaccion
-//             });
-//         }
-
-//         // ================= PAGOS =================
-//         const pagosAplicados = await PagoAplicacionModelo.findAll({
-//             where: {
-//                 TipoDocumento: 'PEDIDO',
-//                 CodigoDocumento: CodigoPedido
-//             },
-//             transaction: transaccion
-//         });
-
-//         for (const pagoAplicacion of pagosAplicados) {
-
-//             await pagoAplicacion.destroy({
-//                 transaction: transaccion
-//             });
-
-//             await PagoModelo.destroy({
-//                 where: {
-//                     CodigoPago: pagoAplicacion.CodigoPago
-//                 },
-//                 transaction: transaccion
-//             });
-//         }
-
-//         await pedido.destroy({
-//             transaction: transaccion
-//         });
-
-//         await transaccion.commit();
-
-//         return {
-//             CodigoPedido,
-//             TotalDetalles: detalles.length,
-//             TotalPagos: pagosAplicados.length,
-//             Mensaje: 'Pedido eliminado completamente'
-//         };
-
-//     } catch (error) {
-
-//         try {
-//             await transaccion.rollback();
-//         } catch (_) { }
-
-//         console.error(error);
-//         throw error;
-//     }
-// };
 
 const EliminarPedido = async (CodigoPedido) => {
 
