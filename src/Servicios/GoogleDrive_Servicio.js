@@ -19,6 +19,7 @@ oAuth2Client.setCredentials({
 // =====================================================
 
 const ID_CARPETA_RAIZ = process.env.ID_CARPETA_DRIVE_RAIZ;
+const CARPETA_GRUPO = process.env.CARPETA_GRUPO || 'Sastrerias';
 
 if (!ID_CARPETA_RAIZ) {
     throw new Error('❌ FALTA ID_CARPETA_DRIVE_RAIZ EN EL .env');
@@ -29,7 +30,8 @@ if (!ID_CARPETA_RAIZ) {
 // =====================================================
 
 const ObtenerOCrearCarpeta = async (drive, nombre, padreId) => {
-    const q = `name='${nombre}' and '${padreId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    const nombreEscapado = nombre.replace(/'/g, "\\'");
+    const q = `name='${nombreEscapado}' and '${padreId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
     const res = await drive.files.list({
         q,
@@ -56,42 +58,31 @@ const ObtenerOCrearCarpeta = async (drive, nombre, padreId) => {
 };
 
 // =====================================================
-// SUBIR RESPALDO
+// CREAR RUTA COMPLETA
 // =====================================================
+const ObtenerOCrearRutaCarpeta = async (ruta) => {
+    const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+    const partes = ruta.split('/').filter(parte => parte.trim() !== '');
+    let idPadreActual = ID_CARPETA_RAIZ;
 
-const SubirArchivoRespaldo = async (nombreArchivo, contenidoSQL) => {
+    for (const nombreCarpeta of partes) {
+        idPadreActual = await ObtenerOCrearCarpeta(drive, nombreCarpeta, idPadreActual);
+    }
+
+    return idPadreActual;
+};
+
+// =====================================================
+// SUBIR ARCHIVO A CARPETA ESPECÍFICA
+// =====================================================
+const SubirArchivoEnCarpeta = async (nombreArchivo, contenidoSQL, idCarpetaDestino) => {
     try {
-        const drive = google.drive({
-            version: 'v3',
-            auth: oAuth2Client
-        });
-
-        const nombreEmpresa =
-            process.env.NOMBRE_EMPRESA || 'EMPRESA_SIN_NOMBRE';
-
-        const fecha = new Date();
-
-        const nombreMes = fecha.toLocaleString('es-ES', {
-            month: 'long',
-            year: 'numeric'
-        });
-
-        const idEmpresa = await ObtenerOCrearCarpeta(
-            drive,
-            nombreEmpresa,
-            ID_CARPETA_RAIZ
-        );
-
-        const idMes = await ObtenerOCrearCarpeta(
-            drive,
-            nombreMes,
-            idEmpresa
-        );
+        const drive = google.drive({ version: 'v3', auth: oAuth2Client });
 
         const respuesta = await drive.files.create({
             requestBody: {
                 name: nombreArchivo,
-                parents: [idMes]
+                parents: [idCarpetaDestino]
             },
             media: {
                 mimeType: 'text/plain',
@@ -101,22 +92,53 @@ const SubirArchivoRespaldo = async (nombreArchivo, contenidoSQL) => {
             supportsAllDrives: true
         });
 
-        console.log(
-            `✅ RESPALDO SUBIDO CORRECTAMENTE | Archivo: ${respuesta.data.name} | ID: ${respuesta.data.id}`
-        );
-
-        return true;
+        console.log(`✅ ARCHIVO SUBIDO | ${respuesta.data.name} | ID: ${respuesta.data.id}`);
+        return { exito: true, id: respuesta.data.id, nombre: respuesta.data.name };
 
     } catch (error) {
-        console.error(
-            '❌ ERROR AL SUBIR RESPALDO A GOOGLE DRIVE:',
-            error.response?.data || error.message
-        );
-
-        return false;
+        console.error('❌ ERROR AL SUBIR:', error.response?.data || error.message);
+        return { exito: false, error: error.message };
     }
 };
 
+// =====================================================
+// SUBIR RESPALDO DIARIO
+// =====================================================
+const SubirArchivoRespaldo = async (nombreArchivo, contenidoSQL) => {
+    try {
+        const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+
+        const nombreEmpresa = process.env.NOMBRE_EMPRESA || 'EMPRESA_SIN_NOMBRE';
+        const fecha = new Date();
+        const nombreMes = fecha.toLocaleString('es-ES', { month: 'long', year: 'numeric' });
+
+        // 📁 RUTA NUEVA: Grupo → Empresa → Respaldos Diarios → Mes
+        const idGrupo = await ObtenerOCrearCarpeta(drive, CARPETA_GRUPO, ID_CARPETA_RAIZ);
+        const idEmpresa = await ObtenerOCrearCarpeta(drive, nombreEmpresa, idGrupo);
+        const idRespaldosDiarios = await ObtenerOCrearCarpeta(drive, 'Respaldos Completos Diarios', idEmpresa);
+        const idMes = await ObtenerOCrearCarpeta(drive, nombreMes, idRespaldosDiarios);
+
+        const respuesta = await drive.files.create({
+            requestBody: { name: nombreArchivo, parents: [idMes] },
+            media: { mimeType: 'text/plain', body: contenidoSQL },
+            fields: 'id,name',
+            supportsAllDrives: true
+        });
+
+        console.log(`✅ RESPALDO DIARIO SUBIDO | ${respuesta.data.name}`);
+        return { exito: true, id: respuesta.data.id, nombre: respuesta.data.name };
+
+    } catch (error) {
+        console.error('❌ ERROR RESPALDO DIARIO:', error.response?.data || error.message);
+        return { exito: false, error: error.message };
+    }
+};
+
+// =====================================================
+// EXPORTACIÓN
+// =====================================================
 module.exports = {
-    SubirArchivoRespaldo
+    SubirArchivoRespaldo,
+    ObtenerOCrearRutaCarpeta,
+    SubirArchivoEnCarpeta
 };

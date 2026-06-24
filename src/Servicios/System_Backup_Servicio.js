@@ -23,9 +23,23 @@ const EscaparValor = (valor) => {
 
 const RespaldoCompleto = async () => {
     try {
+        // ⬇️⬇️⬇️ CAMBIO: Guardamos hora de inicio para calcular duración
+        const horaInicio = DateTime.now().setZone('America/Guatemala');
         const nombreBD = BaseDatos.config.database;
         let sql = '';
-        const resumen = { tablas_procesadas: 0, total_registros: 0 };
+
+        // ⬇️⬇️⬇️ CAMBIO: Resumen ampliado con todos los datos para el informe
+        const resumen = {
+            fecha_inicio: horaInicio.toFormat('yyyy-MM-dd HH:mm:ss'),
+            base_datos: nombreBD,
+            total_tablas_encontradas: 0,
+            tablas_procesadas: 0,
+            tablas_vacias: [],       // Lista de tablas sin registros
+            tablas_con_datos: [],    // Lista de tablas que sí se respaldaron
+            total_registros: 0,
+            duracion_segundos: 0,
+            estado: 'PENDIENTE'
+        };
 
         // 🔹 SOLO LO INDISPENSABLE: Conectar a la base
         sql += `USE [${nombreBD}]\nGO\n\n`;
@@ -45,7 +59,13 @@ const RespaldoCompleto = async () => {
                 TABLE_SCHEMA, TABLE_NAME
         `, { type: Sequelize.QueryTypes.SELECT });
 
-        if (!tablas || tablas.length === 0) LanzarError('No se encontraron tablas', 404);
+        // ⬇️⬇️⬇️ CAMBIO: Guardamos cuántas tablas hay en total
+        resumen.total_tablas_encontradas = tablas.length;
+
+        if (!tablas || tablas.length === 0) {
+            resumen.estado = 'ERROR';
+            LanzarError('No se encontraron tablas en la base de datos', 404);
+        }
 
         for (const { Esquema, Tabla } of tablas) {
             const columnas = await BaseDatos.query(`
@@ -59,11 +79,16 @@ const RespaldoCompleto = async () => {
             const tieneIdentity = columnas.some(c => c.EsIdentity === 1);
             const registros = await BaseDatos.query(`SELECT * FROM [${Esquema}].[${Tabla}]`, { type: Sequelize.QueryTypes.SELECT });
 
-            // 🔹 SI NO HAY DATOS: NO ESCRIBIMOS NADA, AHORRAMOS ESPACIO
-            if (registros.length === 0) continue;
+            // 🔹 SI NO HAY DATOS: Guardamos en la lista de vacías y continuamos
+            if (registros.length === 0) {
+                resumen.tablas_vacias.push(`[${Esquema}].[${Tabla}]`);
+                continue;
+            }
 
+            // ⬇️⬇️⬇️ CAMBIO: Actualizamos contadores y listas
             resumen.tablas_procesadas++;
             resumen.total_registros += registros.length;
+            resumen.tablas_con_datos.push(`[${Esquema}].[${Tabla}] (${registros.length} registros)`);
 
             const nombresCols = columnas.map(c => `[${c.COLUMN_NAME}]`).join(', ');
 
@@ -82,12 +107,26 @@ const RespaldoCompleto = async () => {
             sql += `GO\n\n`;
         }
 
-        const nombreArchivo = `${process.env.NOMBRE_EMPRESA || 'NO SE ENCONTRO EL NOMBRE'} - Respaldo Completo (PERSONALIZADO) - ${DateTime.now().setZone('America/Guatemala').toFormat('yyyy-MM-dd HH.mm')}.sql`;
+        // ⬇️⬇️⬇️ CAMBIO: Calculamos duración y marcamos como exitoso
+        const horaFin = DateTime.now().setZone('America/Guatemala');
+        resumen.duracion_segundos = horaFin.diff(horaInicio, 'seconds').seconds.toFixed(2);
+        resumen.estado = 'EXITOSO';
 
+        const nombreArchivo = `${process.env.NOMBRE_EMPRESA || 'NO SE ENCONTRO EL NOMBRE'} - Respaldo Completo (PERSONALIZADO) - ${horaInicio.toFormat('yyyy-MM-dd HH.mm')}.sql`;
+
+        // ⬇️⬇️⬇️ CAMBIO: Devolvemos también el resumen completo
         return { contenidoSQL: sql, nombreArchivo, resumen };
 
     } catch (error) {
-        throw new Error(`ERROR AL GENERAR RESPALDO: ${error.message}`);
+        // ⬇️⬇️⬇️ CAMBIO: En caso de error también devolvemos resumen
+        const resumenError = {
+            fecha: DateTime.now().setZone('America/Guatemala').toFormat('yyyy-MM-dd HH:mm:ss'),
+            base_datos: BaseDatos.config.database || 'Desconocida',
+            estado: 'FALLIDO',
+            error: error.message
+        };
+        // Lanzamos el error junto con el resumen
+        throw { message: error.message, resumen: resumenError };
     }
 };
 
@@ -233,18 +272,9 @@ const RestaurarRespaldoCompleto = async (contenidoSQL) => {
 
 const RespaldoPorMes = async (anio, mes) => {
     try {
-        // ✅ 1. VALIDACIÓN DE ENTRADA
         if (!anio || !mes || mes < 1 || mes > 12) {
             LanzarError('Debe proporcionar Año y Mes válidos (ej: anio:2025, mes:1)', 400);
         }
-
-        // ✅ 2. DEFINIR RANGO DE FECHAS PARA EL FILTRO
-        const fechaInicio = DateTime.fromObject({ year: anio, month: mes, day: 1 }).setZone('America/Guatemala').startOf('month');
-        const fechaFin = fechaInicio.endOf('month');
-
-        // Formato para SQL: '2025-01-01 00:00:00' y '2025-01-31 23:59:59'
-        const fechaInicioSQL = fechaInicio.toSQL().slice(0, 19).replace('T', ' ');
-        const fechaFinSQL = fechaFin.toSQL().slice(0, 19).replace('T', ' ');
 
         const nombreBD = BaseDatos.config.database;
         let sql = '';
@@ -258,16 +288,13 @@ const RespaldoPorMes = async (anio, mes) => {
 
         sql += `USE [${nombreBD}]\nGO\n\n`;
 
-        // ─────────────────────────────────────────────────────────────────────────────
-        // ✅ CLASIFICACIÓN DEFINITIVA (TAL COMO LA DEJAMOS VALIDADA)
-        // ─────────────────────────────────────────────────────────────────────────────
         const TABLAS_MAESTRAS = [
             'Ad.Empresa', 'Ad.Permiso', 'Ad.PermisoRolRecurso', 'Ad.Recurso', 'Ad.Rol', 'Ad.Usuario',
             'Ca.Abertura', 'Ca.Boton', 'Ca.Categoria', 'Ca.Cliente', 'Ca.Color', 'Ca.EstadoPedido',
             'Ca.Estilo', 'Ca.FormaPago', 'Ca.Marca', 'Ca.Producto', 'Ca.Talla', 'Ca.Tamano', 'Ca.Tela',
             'Ca.TipoCorte', 'Ca.TipoCuello', 'Ca.TipoEmpresa', 'Ca.TipoMedida', 'Ca.TipoProducto',
             'Ca.TipoSolapa', 'Ca.TipoTela',
-            'Inv.Inventario' // ✅ AQUÍ ESTÁ, COMO LO PEDISTE, ES CATÁLOGO/STOCK
+            'Inv.Inventario'
         ];
 
         const TABLAS_TRANSACCIONALES = [
@@ -275,73 +302,61 @@ const RespaldoPorMes = async (anio, mes) => {
                 nombre: 'Ad.Pagos',
                 esquema: 'Ad',
                 tabla: 'Pagos',
-                // ✅ CAMPO DE FECHA ELEGIDO: FechaDeposito (la real del movimiento)
-                filtroFecha: `FechaDeposito BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'`
+                filtroFecha: `YEAR(FechaDeposito) = ${anio} AND MONTH(FechaDeposito) = ${mes}`
             },
             {
                 nombre: 'Fn.Pago',
                 esquema: 'Fn',
                 tabla: 'Pago',
-                // ✅ CAMPO DE FECHA: FechaPago
-                filtroFecha: `FechaPago BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'`
+                filtroFecha: `YEAR(FechaPago) = ${anio} AND MONTH(FechaPago) = ${mes}`
             },
             {
                 nombre: 'Fn.PagoAplicacion',
                 esquema: 'Fn',
                 tabla: 'PagoAplicacion',
-                // ✅ LÓGICA ESPECIAL: No tiene fecha, se une con Pedido por CodigoDocumento
                 filtroFecha: `EXISTS (
                     SELECT 1 FROM Op.Pedido p 
                     WHERE p.CodigoPedido = [Fn].[PagoAplicacion].CodigoDocumento 
-                    AND p.FechaCreacion BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'
+                    AND YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
                 )`
             },
             {
                 nombre: 'Inv.MovimientoInventario',
                 esquema: 'Inv',
                 tabla: 'MovimientoInventario',
-                // ✅ CAMPO DE FECHA: FechaMovimiento
-                filtroFecha: `FechaMovimiento BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'`
+                filtroFecha: `YEAR(FechaMovimiento) = ${anio} AND MONTH(FechaMovimiento) = ${mes}`
             },
             {
                 nombre: 'Op.Pedido',
                 esquema: 'Op',
                 tabla: 'Pedido',
-                // ✅ CAMPO DE FECHA REINA: FechaCreacion
-                filtroFecha: `FechaCreacion BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'`
+                filtroFecha: `YEAR(FechaCreacion) = ${anio} AND MONTH(FechaCreacion) = ${mes}`
             },
             {
                 nombre: 'Op.PedidoDetalle',
                 esquema: 'Op',
                 tabla: 'PedidoDetalle',
-                // ✅ SE UNE A PEDIDO
                 filtroFecha: `EXISTS (
                     SELECT 1 FROM Op.Pedido p 
                     WHERE p.CodigoPedido = [Op].[PedidoDetalle].CodigoPedido 
-                    AND p.FechaCreacion BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'
+                    AND YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
                 )`
             },
             {
                 nombre: 'Op.PedidoDetalleMedida',
                 esquema: 'Op',
                 tabla: 'PedidoDetalleMedida',
-                // ✅ SE UNE A DETALLE -> PEDIDO
                 filtroFecha: `EXISTS (
                     SELECT 1 FROM Op.Pedido p 
                     INNER JOIN Op.PedidoDetalle pd ON pd.CodigoPedido = p.CodigoPedido
                     WHERE pd.CodigoPedidoDetalle = [Op].[PedidoDetalleMedida].CodigoPedidoDetalle 
-                    AND p.FechaCreacion BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'
+                    AND YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
                 )`
             }
         ];
 
-        // ─────────────────────────────────────────────────────────────────────────────
-        // 🔹 PROCESAR TABLAS MAESTRAS (SELECCION * SIN FILTRO)
-        // ─────────────────────────────────────────────────────────────────────────────
         for (const nombreCompleto of TABLAS_MAESTRAS) {
             const [Esquema, Tabla] = nombreCompleto.split('.');
-
-            // Obtener columnas e identidad (igual que tu respaldo completo)
             const columnas = await BaseDatos.query(`
                 SELECT COLUMN_NAME, COLUMNPROPERTY(OBJECT_ID('[${Esquema}].[${Tabla}]'), COLUMN_NAME, 'IsIdentity') AS EsIdentity
                 FROM INFORMATION_SCHEMA.COLUMNS 
@@ -350,8 +365,6 @@ const RespaldoPorMes = async (anio, mes) => {
             `, { type: Sequelize.QueryTypes.SELECT });
 
             const tieneIdentity = columnas.some(c => c.EsIdentity === 1);
-
-            // 🔹 AQUÍ LA DIFERENCIA: SELECCIONA TODO, SIN WHERE
             const registros = await BaseDatos.query(`SELECT * FROM [${Esquema}].[${Tabla}]`, { type: Sequelize.QueryTypes.SELECT });
 
             if (registros.length === 0) continue;
@@ -361,24 +374,17 @@ const RespaldoPorMes = async (anio, mes) => {
             const nombresCols = columnas.map(c => `[${c.COLUMN_NAME}]`).join(', ');
 
             if (tieneIdentity) sql += `SET IDENTITY_INSERT [${Esquema}].[${Tabla}] ON;\n`;
-
-            // Lotes de 100 igual que tu código
             for (let i = 0; i < registros.length; i += 100) {
                 const lote = registros.slice(i, i + 100);
                 const valores = lote.map(reg => `(${columnas.map(c => EscaparValor(reg[c.COLUMN_NAME])).join(', ')})`);
                 sql += `INSERT INTO [${Esquema}].[${Tabla}] (${nombresCols}) VALUES\n${valores.join(',\n')};\n`;
             }
-
             if (tieneIdentity) sql += `SET IDENTITY_INSERT [${Esquema}].[${Tabla}] OFF;\n`;
             sql += `GO\n\n`;
         }
 
-        // ─────────────────────────────────────────────────────────────────────────────
-        // 🔹 PROCESAR TABLAS TRANSACCIONALES (SELECCION * CON FILTRO DE FECHA)
-        // ─────────────────────────────────────────────────────────────────────────────
         for (const tablaTrans of TABLAS_TRANSACCIONALES) {
             const { esquema, tabla, filtroFecha } = tablaTrans;
-
             const columnas = await BaseDatos.query(`
                 SELECT COLUMN_NAME, COLUMNPROPERTY(OBJECT_ID('[${esquema}].[${tabla}]'), COLUMN_NAME, 'IsIdentity') AS EsIdentity
                 FROM INFORMATION_SCHEMA.COLUMNS 
@@ -387,49 +393,36 @@ const RespaldoPorMes = async (anio, mes) => {
             `, { type: Sequelize.QueryTypes.SELECT });
 
             const tieneIdentity = columnas.some(c => c.EsIdentity === 1);
-
-            // 🔹 AQUÍ LA MAGIA: SELECCIONA SOLO LO DEL MES ELEGIDO
             const registros = await BaseDatos.query(`
-                SELECT * 
-                FROM [${esquema}].[${tabla}] 
-                WHERE ${filtroFecha}
+                SELECT * FROM [${esquema}].[${tabla}] WHERE ${filtroFecha}
             `, { type: Sequelize.QueryTypes.SELECT });
 
-            if (registros.length === 0) {
-                continue;
-            }
+            if (registros.length === 0) continue;
 
             resumen.tablas_transaccionales++;
             resumen.total_registros += registros.length;
             const nombresCols = columnas.map(c => `[${c.COLUMN_NAME}]`).join(', ');
 
             if (tieneIdentity) sql += `SET IDENTITY_INSERT [${esquema}].[${tabla}] ON;\n`;
-
             for (let i = 0; i < registros.length; i += 100) {
                 const lote = registros.slice(i, i + 100);
                 const valores = lote.map(reg => `(${columnas.map(c => EscaparValor(reg[c.COLUMN_NAME])).join(', ')})`);
                 sql += `INSERT INTO [${esquema}].[${tabla}] (${nombresCols}) VALUES\n${valores.join(',\n')};\n`;
             }
-
             if (tieneIdentity) sql += `SET IDENTITY_INSERT [${esquema}].[${tabla}] OFF;\n`;
             sql += `GO\n\n`;
         }
 
-        // ✅ NOMBRE DEL ARCHIVO (INDICA EL MES RESPALDADO)
-        const nombreMesLargo = fechaInicio.toFormat('MMMM');
+        const nombreMesLargo = DateTime.fromObject({ year: anio, month: mes }).setZone('America/Guatemala').toFormat('MMMM');
         const nombreArchivo = `${process.env.NOMBRE_EMPRESA || 'EMPRESA'} - Respaldo Mensual - ${anio}-${mes.toString().padStart(2, '0')} (${nombreMesLargo}) - ${DateTime.now().setZone('America/Guatemala').toFormat('yyyy-MM-dd HH.mm')}.sql`;
 
-        return {
-            contenidoSQL: sql,
-            nombreArchivo,
-            resumen,
-            rango_respaldado: `${fechaInicioSQL} al ${fechaFinSQL}`
-        };
+        return { contenidoSQL: sql, nombreArchivo, resumen };
 
     } catch (error) {
         throw new Error(`ERROR AL GENERAR RESPALDO MENSUAL: ${error.message}`);
     }
 };
+
 
 const BorrarDatosPorMes = async (anio, mes) => {
     try {
@@ -437,19 +430,10 @@ const BorrarDatosPorMes = async (anio, mes) => {
             LanzarError('Año y Mes inválidos para borrar', 400);
         }
 
-        // 📅 CONFIGURACIÓN DE FECHAS: Rango completo del mes en zona Guatemala
-        const fechaInicio = new Date(Date.UTC(anio, mes - 1, 1, 6, 0, 0)); 
-        const fechaFin = new Date(Date.UTC(anio, mes, 0, 29, 59, 59)); 
-        const fechaInicioSQL = fechaInicio.toISOString().slice(0, 19).replace('T', ' ');
-        const fechaFinSQL = fechaFin.toISOString().slice(0, 19).replace('T', ' ');
-
         const conexion = await BaseDatos.connectionManager.getConnection();
         const { Request } = require('tedious');
         let registrosBorrados = 0;
 
-
-        // ✅ ORDEN ESTRICTO DE BORRADO (HIJOS PRIMERO, LUEGO PADRES)
-        // ✅ ESTRUCTURA BASADA EXACTAMENTE EN TUS INDICACIONES
         const ORDEN_BORRADO = [
             {
                 nombre: 'Op.PedidoDetalleMedida',
@@ -458,8 +442,7 @@ const BorrarDatosPorMes = async (anio, mes) => {
                     FROM Op.PedidoDetalleMedida pdm
                     INNER JOIN Op.PedidoDetalle pd ON pd.CodigoPedidoDetalle = pdm.CodigoPedidoDetalle
                     INNER JOIN Op.Pedido p ON p.CodigoPedido = pd.CodigoPedido
-                    -- 🎯 FILTRO CORRECTO: Solo por fecha del Pedido Padre
-                    WHERE p.FechaCreacion BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'
+                    WHERE YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
                 `
             },
             {
@@ -468,8 +451,7 @@ const BorrarDatosPorMes = async (anio, mes) => {
                     DELETE pd 
                     FROM Op.PedidoDetalle pd
                     INNER JOIN Op.Pedido p ON p.CodigoPedido = pd.CodigoPedido
-                    -- 🎯 FILTRO CORRECTO: Esta tabla NO tiene fecha, se filtra por Pedido
-                    WHERE p.FechaCreacion BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'
+                    WHERE YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
                 `
             },
             {
@@ -478,38 +460,34 @@ const BorrarDatosPorMes = async (anio, mes) => {
                     DELETE pa 
                     FROM Fn.PagoAplicacion pa
                     INNER JOIN Op.Pedido p ON p.CodigoPedido = pa.CodigoDocumento
-                    -- 🎯 FILTRO CORRECTO: Tabla intermedia sin fecha, ligada al Pedido
-                    WHERE p.FechaCreacion BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'
+                    WHERE YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
                 `
             },
             {
                 nombre: 'Inv.MovimientoInventario',
-                // 📌 CAMPO CORRECTO SEGÚN TU DATO: FechaMovimiento
-                query: `DELETE FROM Inv.MovimientoInventario WHERE FechaMovimiento BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'`
+                query: `DELETE FROM Inv.MovimientoInventario WHERE YEAR(FechaMovimiento) = ${anio} AND MONTH(FechaMovimiento) = ${mes}`
             },
             {
                 nombre: 'Fn.Pago',
-                // 📌 CAMPO CORRECTO SEGÚN TU DATO: FechaPago (Usamos esta, si prefieres FechaCreacion me dices)
-                query: `DELETE FROM Fn.Pago WHERE FechaPago BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'`
+                query: `DELETE FROM Fn.Pago WHERE YEAR(FechaPago) = ${anio} AND MONTH(FechaPago) = ${mes}`
             },
             {
                 nombre: 'Ad.Pagos',
-                // 📌 CAMPO CORRECTO SEGÚN TU DATO: FechaDeposito
-                query: `DELETE FROM Ad.Pagos WHERE FechaDeposito BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'`
+                query: `DELETE FROM Ad.Pagos WHERE YEAR(FechaDeposito) = ${anio} AND MONTH(FechaDeposito) = ${mes}`
             },
             {
                 nombre: 'Op.Pedido',
-                // 📌 CAMPO CORRECTO PRINCIPAL: FechaCreacion (Como me indicaste)
-                query: `DELETE FROM Op.Pedido WHERE FechaCreacion BETWEEN '${fechaInicioSQL}' AND '${fechaFinSQL}'`
+                query: `DELETE FROM Op.Pedido WHERE YEAR(FechaCreacion) = ${anio} AND MONTH(FechaCreacion) = ${mes}`
             }
         ];
 
-        // EJECUCIÓN
         for (const tabla of ORDEN_BORRADO) {
             await new Promise((resolve, reject) => {
                 const req = new Request(tabla.query, (err, rowCount) => {
                     if (err) return reject(new Error(`Error borrando ${tabla.nombre}: ${err.message}`));
-                    registrosBorrados += rowCount;
+                    const cantidad = rowCount || 0;
+                    console.log(`🗑️ Borrados ${cantidad} registros de ${tabla.nombre}`);
+                    registrosBorrados += cantidad;
                     resolve();
                 });
                 conexion.execSql(req);
@@ -518,16 +496,13 @@ const BorrarDatosPorMes = async (anio, mes) => {
 
         BaseDatos.connectionManager.releaseConnection(conexion);
 
-        // 🚨 MENSAJE FINAL
         if (registrosBorrados === 0) {
-            const error = new Error(`ℹ️ Atención: No se encontraron registros para el mes ${mes}/${anio}.`);
-            error.tipo = 'Alerta';
-            throw error;
+            throw new Error(`No se encontraron registros para borrar en ${mes}/${anio}`);
         }
 
-        return { 
-            mensaje: `✅ Borrado completado. Total registros eliminados: ${registrosBorrados}`, 
-            registrosBorrados 
+        return {
+            mensaje: `✅ Borrado completado. Total registros eliminados: ${registrosBorrados}`,
+            registrosBorrados
         };
 
     } catch (error) {
@@ -536,10 +511,82 @@ const BorrarDatosPorMes = async (anio, mes) => {
 };
 
 
+const ExistenRegistrosPorMes = async (anio, mes) => {
+    try {
+        if (!anio || !mes || mes < 1 || mes > 12) {
+            LanzarError('Año y mes inválidos para verificar', 400);
+        }
+
+        const TABLAS_TRANSACCIONALES = [
+            {
+                esquema: 'Ad', tabla: 'Pagos',
+                filtro: `YEAR(FechaDeposito) = ${anio} AND MONTH(FechaDeposito) = ${mes}`
+            },
+            {
+                esquema: 'Fn', tabla: 'Pago',
+                filtro: `YEAR(FechaPago) = ${anio} AND MONTH(FechaPago) = ${mes}`
+            },
+            {
+                esquema: 'Fn', tabla: 'PagoAplicacion',
+                filtro: `EXISTS (
+                    SELECT 1 FROM Op.Pedido p 
+                    WHERE p.CodigoPedido = [Fn].[PagoAplicacion].CodigoDocumento 
+                    AND YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
+                )`
+            },
+            {
+                esquema: 'Inv', tabla: 'MovimientoInventario',
+                filtro: `YEAR(FechaMovimiento) = ${anio} AND MONTH(FechaMovimiento) = ${mes}`
+            },
+            {
+                esquema: 'Op', tabla: 'Pedido',
+                filtro: `YEAR(FechaCreacion) = ${anio} AND MONTH(FechaCreacion) = ${mes}`
+            },
+            {
+                esquema: 'Op', tabla: 'PedidoDetalle',
+                filtro: `EXISTS (
+                    SELECT 1 FROM Op.Pedido p 
+                    JOIN Op.PedidoDetalle pd ON pd.CodigoPedido = p.CodigoPedido
+                    WHERE YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
+                )`
+            },
+            {
+                esquema: 'Op', tabla: 'PedidoDetalleMedida',
+                filtro: `EXISTS (
+                    SELECT 1 FROM Op.Pedido p 
+                    JOIN Op.PedidoDetalle pd ON pd.CodigoPedido = p.CodigoPedido
+                    JOIN Op.PedidoDetalleMedida pdm ON pdm.CodigoPedidoDetalle = pd.CodigoPedidoDetalle
+                    WHERE YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
+                )`
+            }
+        ];
+
+        for (const tabla of TABLAS_TRANSACCIONALES) {
+            const resultado = await BaseDatos.query(`
+                SELECT TOP 1 1 AS Existe 
+                FROM [${tabla.esquema}].[${tabla.tabla}] 
+                WHERE ${tabla.filtro}
+            `, { type: Sequelize.QueryTypes.SELECT });
+
+            if (resultado.length > 0) {
+                console.log(`✅ Encontrados registros en ${tabla.nombre || tabla.esquema + '.' + tabla.tabla}`);
+                return true;
+            }
+        }
+
+        console.log(`ℹ️ No hay registros transaccionales para ${mes}/${anio} → no se genera respaldo`);
+        return false;
+
+    } catch (error) {
+        throw new Error(`Error al verificar registros del mes ${mes}/${anio}: ${error.message}`);
+    }
+};
+
 
 module.exports = {
     RespaldoCompleto,
     RestaurarRespaldoCompleto,
     RespaldoPorMes,
-    BorrarDatosPorMes
+    BorrarDatosPorMes,
+    ExistenRegistrosPorMes 
 };
