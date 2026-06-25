@@ -5,8 +5,8 @@ const dns = require('dns');
 const transportadorCorreo = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT),
-    secure: false,
-    requireTLS: true,  // 👈 OBLIGATORIO para Brevo
+    secure: process.env.SMTP_SECURE === 'true', 
+    requireTLS: false, 
     family: 4,
     lookup: (hostname, options, callback) => {
         dns.lookup(hostname, { family: 4 }, callback);
@@ -15,14 +15,15 @@ const transportadorCorreo = nodemailer.createTransport({
         user: process.env.SMTP_USUARIO,
         pass: process.env.SMTP_CLAVE
     },
-    connectionTimeout: 20000,
-    greetingTimeout: 15000,
-    socketTimeout: 20000,
+    connectionTimeout: 30000,
+    greetingTimeout: 20000,
+    socketTimeout: 30000,
     tls: {
         rejectUnauthorized: false,
         minVersion: 'TLSv1.2'
     }
 });
+
 
 const Correo_Informe_respaldo = async (resumen) => {
     let asuntoCorreo, cuerpoHTML;
