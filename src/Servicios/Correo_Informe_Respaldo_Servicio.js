@@ -1,6 +1,11 @@
 const nodemailer = require('nodemailer');
 const { DateTime } = require('luxon');
 
+// Aplica la configuración para usar solo IPv4 si está activada
+if (process.env.DNS_PARA_IPV4 === 'true') {
+  process.env.NODE_OPTIONS = '--dns-result-order=ipv4first';
+}
+
 const transportadorCorreo = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
@@ -9,7 +14,9 @@ const transportadorCorreo = nodemailer.createTransport({
         user: process.env.SMTP_USUARIO,
         pass: process.env.SMTP_CLAVE
     },
-    family: 4
+    family: 4, // Fuerza IPv4
+    dnsTimeout: 10000,
+    connectionTimeout: 15000
 });
 
 const Correo_Informe_respaldo = async (resumen) => {
@@ -20,9 +27,8 @@ const Correo_Informe_respaldo = async (resumen) => {
     const colorEstadoDiario = hayAlerta ? '#f59e0b' : '#059669';
     const tituloDiario = hayAlerta ? '⚠️ RESPALDO DIARIO<br>CON ADVERTENCIAS' : '✅ RESPALDO DIARIO<br>EXITOSO';
 
-    // 📌 Definimos estado corto para meses antiguos
     let tituloMesesAntiguos = '';
-    let colorEstadoMeses = '#9ca3af'; // gris por defecto
+    let colorEstadoMeses = '#9ca3af';
     if (resumen.revision_mes_antiguo) {
         if (resumen.revision_mes_antiguo.error) {
             tituloMesesAntiguos = '❌ MESES ANTIGUOS<br>ERROR';
@@ -38,7 +44,8 @@ const Correo_Informe_respaldo = async (resumen) => {
         tituloMesesAntiguos = 'ℹ️ MESES ANTIGUOS<br>SIN REVISIÓN';
     }
 
-    asuntoCorreo = `${hayAlerta ? '⚠️' : '✅'} ${process.env.NOMBRE_EMPRESA || 'EMPRESA'} | Respaldo Diario | ${resumen.fecha_inicio}`;
+    const nombreEmpresa = process.env.NOMBRE_EMPRESA || 'EMPRESA';
+    asuntoCorreo = `${hayAlerta ? '⚠️' : '✅'} ${nombreEmpresa} | Respaldo Diario | ${resumen.fecha_inicio}`;
 
     if (resumen.estado === 'EXITOSO') {
         cuerpoHTML = `
@@ -51,7 +58,6 @@ const Correo_Informe_respaldo = async (resumen) => {
                 * { margin: 0; padding: 0; box-sizing: border-box; }
                 body { font-family: 'Segoe UI', Roboto, Arial, sans-serif; background-color: #f3f4f6; padding: 30px 15px; }
                 .contenedor { max-width: 680px; margin: 0 auto; background: #ffffff; border-radius: 12px; box-shadow: 0 4px 12px rgba(0,0,0,0.08); overflow: hidden; }
-                /* 📌 Encabezado en dos columnas */
                 .encabezado { display: flex; flex-wrap: wrap; }
                 .columna-estado { width: 50%; padding: 32px 20px; text-align: center; color: #ffffff; }
                 .columna-diario { background: linear-gradient(135deg, ${colorEstadoDiario}, ${colorEstadoDiario}cc); }
@@ -76,10 +82,9 @@ const Correo_Informe_respaldo = async (resumen) => {
         </head>
         <body>
             <div class="contenedor">
-                <!-- 📌 ENCABEZADO DIVIDIDO EN DOS COLUMNAS -->
                 <div class="encabezado">
                     <div class="columna-estado columna-diario">
-                        <h1>${tituloDiario}</h1>
+                        <h1>${nombreEmpresa}<br>${tituloDiario}</h1>
                     </div>
                     <div class="columna-estado columna-antiguos">
                         <h1>${tituloMesesAntiguos}</h1>
@@ -101,33 +106,32 @@ const Correo_Informe_respaldo = async (resumen) => {
 
                     <div class="lista-contenedor">
                         <h3 class="lista-titulo">📌 Tablas con datos respaldadas:</h3>
-                        ${resumen.tablas_con_datos.length > 0
-                ? resumen.tablas_con_datos.map(t => `<div class="lista-item">• ${t}</div>`).join('')
-                : `<div class="lista-item">Ninguna</div>`}
+                        ${resumen.tablas_con_datos.length > 0 
+                            ? resumen.tablas_con_datos.map(t => `<div class="lista-item">• ${t}</div>`).join('') 
+                            : `<div class="lista-item">Ninguna</div>`}
                     </div>
 
                     <div class="lista-contenedor" style="margin-top:15px;">
                         <h3 class="lista-titulo">📋 Tablas sin registros:</h3>
-                        ${resumen.tablas_vacias.length > 0
-                ? resumen.tablas_vacias.map(t => `<div class="lista-item">• ${t}</div>`).join('')
-                : `<div class="lista-item">Ninguna</div>`}
+                        ${resumen.tablas_vacias.length > 0 
+                            ? resumen.tablas_vacias.map(t => `<div class="lista-item">• ${t}</div>`).join('') 
+                            : `<div class="lista-item">Ninguna</div>`}
                     </div>
 
-                    <!-- 👇 SECCIÓN DETALLADA DE MESES ANTIGUOS (IGUAL QUE ANTES) -->
                     <div style="margin-top:30px; border-top:1px dashed #e5e7eb; padding-top:25px;">
                         <h2 class="titulo-seccion">🔍 Revisión de Meses Antiguos</h2>
-                        ${resumen.revision_mes_antiguo?.error
-                ? `<div class="error">${resumen.revision_mes_antiguo.mensaje}</div>`
-                : resumen.revision_mes_antiguo?.procesado
-                    ? `<div class="info">
+                        ${resumen.revision_mes_antiguo?.error 
+                            ? `<div class="error">${resumen.revision_mes_antiguo.mensaje}</div>` 
+                            : resumen.revision_mes_antiguo?.procesado 
+                                ? `<div class="info">
                                     <strong>${resumen.revision_mes_antiguo.mensaje}</strong><br><br>
                                     📆 Mes: ${resumen.revision_mes_antiguo.nombreMes} ${resumen.revision_mes_antiguo.anio}<br>
                                     📥 Registros respaldados: ${resumen.revision_mes_antiguo.registrosRespaldados.toLocaleString()}<br>
                                     🗑️ Registros eliminados: ${resumen.revision_mes_antiguo.registrosEliminados.toLocaleString()}<br>
                                     ☁️ Archivo en Drive: ID ${resumen.revision_mes_antiguo.idArchivoDrive}
-                                   </div>`
-                    : `<div class="info">${resumen.revision_mes_antiguo?.mensaje || 'No se realizó revisión'}</div>`
-            }
+                                   </div>` 
+                                : `<div class="info">${resumen.revision_mes_antiguo?.mensaje || 'No se realizó revisión'}</div>`
+                        }
                     </div>
 
                 </div>
@@ -170,7 +174,7 @@ const Correo_Informe_respaldo = async (resumen) => {
             <div class="contenedor">
                 <div class="encabezado">
                     <div class="columna-estado columna-diario">
-                        <h1>❌ PROCESO<br>CON ERROR</h1>
+                        <h1>${nombreEmpresa}<br>❌ PROCESO<br>CON ERROR</h1>
                     </div>
                     <div class="columna-estado columna-antiguos">
                         <h1>❌ NO EJECUTADO</h1>
