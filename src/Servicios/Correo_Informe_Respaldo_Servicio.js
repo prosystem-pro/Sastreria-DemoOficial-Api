@@ -1,11 +1,6 @@
 const nodemailer = require('nodemailer');
 const { DateTime } = require('luxon');
 
-// Aplica la configuración para usar solo IPv4 si está activada
-if (process.env.DNS_PARA_IPV4 === 'true') {
-  process.env.NODE_OPTIONS = '--dns-result-order=ipv4first';
-}
-
 const transportadorCorreo = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
@@ -14,7 +9,7 @@ const transportadorCorreo = nodemailer.createTransport({
         user: process.env.SMTP_USUARIO,
         pass: process.env.SMTP_CLAVE
     },
-    family: 4, // Fuerza IPv4
+    family: 4, // ✅ Fuerza IPv4 directamente en el envío
     dnsTimeout: 10000,
     connectionTimeout: 15000
 });

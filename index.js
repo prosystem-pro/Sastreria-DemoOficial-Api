@@ -1,4 +1,10 @@
 require('dotenv').config();
+
+// ✅ AQUÍ VA PRIMERO: Se activa si tienes DNS_PARA_IPV4 = true en Railway
+if (process.env.DNS_PARA_IPV4 === 'true') {
+  process.env.NODE_OPTIONS = '--dns-result-order=ipv4first';
+}
+
 process.env.TZ = 'UTC';
 
 const os = require('os');
@@ -10,7 +16,6 @@ const { Correo_Informe_respaldo } = require('./src/Servicios/Correo_Informe_Resp
 const { DateTime } = require('luxon');
 
 const PORT = process.env.PORT || 3000;
-
 const MESES_A_MANTENER = 12;
 
 
