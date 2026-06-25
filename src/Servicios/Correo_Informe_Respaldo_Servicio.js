@@ -6,6 +6,7 @@ const transportadorCorreo = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT),
     secure: false,
+    requireTLS: true,  // 👈 ESTA LÍNEA ES OBLIGATORIA
     family: 4,
     lookup: (hostname, options, callback) => {
         dns.lookup(hostname, { family: 4 }, callback);
@@ -16,8 +17,14 @@ const transportadorCorreo = nodemailer.createTransport({
     },
     connectionTimeout: 20000,
     greetingTimeout: 15000,
-    socketTimeout: 20000
+    socketTimeout: 20000,
+    tls: {
+        rejectUnauthorized: false,
+        minVersion: 'TLSv1.2'
+    }
 });
+
+
 
 const Correo_Informe_respaldo = async (resumen) => {
     let asuntoCorreo, cuerpoHTML;
