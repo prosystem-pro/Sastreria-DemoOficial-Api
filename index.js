@@ -12,7 +12,6 @@ const { DateTime } = require('luxon');
 const PORT = process.env.PORT || 3000;
 const MESES_A_MANTENER = 12;
 
-
 const EvaluarYProcesarMesAntiguo = async () => {
   const fechaActual = DateTime.now().setZone('America/Guatemala');
   const mesLimite = fechaActual.minus({ months: MESES_A_MANTENER }).startOf('month');
@@ -75,7 +74,6 @@ cron.schedule('*/1 * * * *', async () => {
     await Correo_Informe_respaldo(resumenError);
   }
 }, { timezone: "America/Guatemala" });
-
 
 const networkInterfaces = os.networkInterfaces();
 let ipLocal = 'localhost';

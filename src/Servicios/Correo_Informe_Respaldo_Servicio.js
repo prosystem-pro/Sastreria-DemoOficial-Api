@@ -1,29 +1,5 @@
-const nodemailer = require('nodemailer');
 const { DateTime } = require('luxon');
-const dns = require('dns');
-
-const transportadorCorreo = nodemailer.createTransport({
-    host: process.env.SMTP_HOST,
-    port: Number(process.env.SMTP_PORT),
-    secure: process.env.SMTP_SECURE === 'true', 
-    requireTLS: false, 
-    family: 4,
-    lookup: (hostname, options, callback) => {
-        dns.lookup(hostname, { family: 4 }, callback);
-    },
-    auth: {
-        user: process.env.SMTP_USUARIO,
-        pass: process.env.SMTP_CLAVE
-    },
-    connectionTimeout: 30000,
-    greetingTimeout: 20000,
-    socketTimeout: 30000,
-    tls: {
-        rejectUnauthorized: false,
-        minVersion: 'TLSv1.2'
-    }
-});
-
+const axios = require('axios');
 
 const Correo_Informe_respaldo = async (resumen) => {
     let asuntoCorreo, cuerpoHTML;
@@ -190,13 +166,30 @@ const Correo_Informe_respaldo = async (resumen) => {
         `;
     }
 
-    // ✅ LÍNEA CORREGIDA: usa el correo verificado en Brevo
-    await transportadorCorreo.sendMail({
-        from: `"ProSystem" <${process.env.CORREO_DESTINO}>`,
-        to: process.env.CORREO_DESTINO,
-        subject: asuntoCorreo,
-        html: cuerpoHTML
-    });
+    // ✅ ENVÍO SOLO POR API BREVO
+    try {
+        const respuesta = await axios.post(
+            'https://api.brevo.com/v3/smtp/email',
+            {
+                sender: { name: 'ProSystem', email: 'prosystem490@gmail.com' },
+                to: [{ email: process.env.CORREO_DESTINO }],
+                subject: asuntoCorreo,
+                htmlContent: cuerpoHTML
+            },
+            {
+                headers: {
+                    'api-key': process.env.BREVO_API_KEY,
+                    'Content-Type': 'application/json'
+                },
+                timeout: 25000
+            }
+        );
+        console.log('✅ Correo enviado correctamente por API Brevo');
+        return respuesta.data;
+    } catch (err) {
+        console.error('❌ Error enviando correo:', err.response?.data || err.message);
+        throw err;
+    }
 };
 
 module.exports = { Correo_Informe_respaldo };
