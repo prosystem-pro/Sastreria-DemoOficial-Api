@@ -7,6 +7,9 @@ const transportadorCorreo = nodemailer.createTransport({
     port: Number(process.env.SMTP_PORT),
     secure: false,
     family: 4,
+    lookup: (hostname, options, callback) => {
+        dns.lookup(hostname, { family: 4 }, callback);
+    },
     auth: {
         user: process.env.SMTP_USUARIO,
         pass: process.env.SMTP_CLAVE
