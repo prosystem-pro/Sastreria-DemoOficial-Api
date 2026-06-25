@@ -8,7 +8,8 @@ const transportadorCorreo = nodemailer.createTransport({
     auth: {
         user: process.env.SMTP_USUARIO,
         pass: process.env.SMTP_CLAVE
-    }
+    },
+    family: 4
 });
 
 const Correo_Informe_respaldo = async (resumen) => {
@@ -37,7 +38,7 @@ const Correo_Informe_respaldo = async (resumen) => {
         tituloMesesAntiguos = 'ℹ️ MESES ANTIGUOS<br>SIN REVISIÓN';
     }
 
-   asuntoCorreo = `${hayAlerta ? '⚠️' : '✅'} ${process.env.NOMBRE_EMPRESA || 'EMPRESA'} | Respaldo Diario | ${resumen.fecha_inicio}`;
+    asuntoCorreo = `${hayAlerta ? '⚠️' : '✅'} ${process.env.NOMBRE_EMPRESA || 'EMPRESA'} | Respaldo Diario | ${resumen.fecha_inicio}`;
 
     if (resumen.estado === 'EXITOSO') {
         cuerpoHTML = `
@@ -100,33 +101,33 @@ const Correo_Informe_respaldo = async (resumen) => {
 
                     <div class="lista-contenedor">
                         <h3 class="lista-titulo">📌 Tablas con datos respaldadas:</h3>
-                        ${resumen.tablas_con_datos.length > 0 
-                            ? resumen.tablas_con_datos.map(t => `<div class="lista-item">• ${t}</div>`).join('') 
-                            : `<div class="lista-item">Ninguna</div>`}
+                        ${resumen.tablas_con_datos.length > 0
+                ? resumen.tablas_con_datos.map(t => `<div class="lista-item">• ${t}</div>`).join('')
+                : `<div class="lista-item">Ninguna</div>`}
                     </div>
 
                     <div class="lista-contenedor" style="margin-top:15px;">
                         <h3 class="lista-titulo">📋 Tablas sin registros:</h3>
-                        ${resumen.tablas_vacias.length > 0 
-                            ? resumen.tablas_vacias.map(t => `<div class="lista-item">• ${t}</div>`).join('') 
-                            : `<div class="lista-item">Ninguna</div>`}
+                        ${resumen.tablas_vacias.length > 0
+                ? resumen.tablas_vacias.map(t => `<div class="lista-item">• ${t}</div>`).join('')
+                : `<div class="lista-item">Ninguna</div>`}
                     </div>
 
                     <!-- 👇 SECCIÓN DETALLADA DE MESES ANTIGUOS (IGUAL QUE ANTES) -->
                     <div style="margin-top:30px; border-top:1px dashed #e5e7eb; padding-top:25px;">
                         <h2 class="titulo-seccion">🔍 Revisión de Meses Antiguos</h2>
-                        ${resumen.revision_mes_antiguo?.error 
-                            ? `<div class="error">${resumen.revision_mes_antiguo.mensaje}</div>` 
-                            : resumen.revision_mes_antiguo?.procesado 
-                                ? `<div class="info">
+                        ${resumen.revision_mes_antiguo?.error
+                ? `<div class="error">${resumen.revision_mes_antiguo.mensaje}</div>`
+                : resumen.revision_mes_antiguo?.procesado
+                    ? `<div class="info">
                                     <strong>${resumen.revision_mes_antiguo.mensaje}</strong><br><br>
                                     📆 Mes: ${resumen.revision_mes_antiguo.nombreMes} ${resumen.revision_mes_antiguo.anio}<br>
                                     📥 Registros respaldados: ${resumen.revision_mes_antiguo.registrosRespaldados.toLocaleString()}<br>
                                     🗑️ Registros eliminados: ${resumen.revision_mes_antiguo.registrosEliminados.toLocaleString()}<br>
                                     ☁️ Archivo en Drive: ID ${resumen.revision_mes_antiguo.idArchivoDrive}
-                                   </div>` 
-                                : `<div class="info">${resumen.revision_mes_antiguo?.mensaje || 'No se realizó revisión'}</div>`
-                        }
+                                   </div>`
+                    : `<div class="info">${resumen.revision_mes_antiguo?.mensaje || 'No se realizó revisión'}</div>`
+            }
                     </div>
 
                 </div>
