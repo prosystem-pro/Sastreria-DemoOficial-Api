@@ -74,8 +74,8 @@ const EvaluarYProcesarMesAntiguo = async () => {
 };
 
 
-// cron.schedule('*/1 * * * *', async () => { Para pruebas de 1 minuto
-cron.schedule('0 4 * * *', async () => {
+cron.schedule('*/10 * * * *', async () => { //Para pruebas de 1 minuto
+// cron.schedule('0 4 * * *', async () => {
   try {
 
     const { contenidoSQL, nombreArchivo, resumen } = await ServicioBackup.RespaldoCompleto();
