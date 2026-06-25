@@ -6,7 +6,7 @@ const transportadorCorreo = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: Number(process.env.SMTP_PORT),
     secure: false,
-    requireTLS: true,  // 👈 ESTA LÍNEA ES OBLIGATORIA
+    requireTLS: true,  // 👈 OBLIGATORIO para Brevo
     family: 4,
     lookup: (hostname, options, callback) => {
         dns.lookup(hostname, { family: 4 }, callback);
@@ -23,8 +23,6 @@ const transportadorCorreo = nodemailer.createTransport({
         minVersion: 'TLSv1.2'
     }
 });
-
-
 
 const Correo_Informe_respaldo = async (resumen) => {
     let asuntoCorreo, cuerpoHTML;
@@ -99,7 +97,7 @@ const Correo_Informe_respaldo = async (resumen) => {
                 </div>
 
                 <div class="cuerpo">
-                    <h2 class="titulo-seccion">📋 Resumen del Respado Diario</h2>
+                    <h2 class="titulo-seccion">📋 Resumen del Respaldo Diario</h2>
                     <div class="fila"><span class="etiqueta">📅 Fecha y hora:</span><span class="valor">${resumen.fecha_inicio}</span></div>
                     <div class="fila"><span class="etiqueta">🗄️ Base de datos:</span><span class="valor">${resumen.base_datos}</span></div>
                     <div class="fila"><span class="etiqueta">📊 Total de tablas:</span><span class="valor">${resumen.total_tablas_encontradas}</span></div>
@@ -191,8 +189,9 @@ const Correo_Informe_respaldo = async (resumen) => {
         `;
     }
 
+    // ✅ LÍNEA CORREGIDA: usa el correo verificado en Brevo
     await transportadorCorreo.sendMail({
-        from: `"Sistema de Respaldos" <${process.env.SMTP_USUARIO}>`,
+        from: `"ProSystem" <${process.env.CORREO_DESTINO}>`,
         to: process.env.CORREO_DESTINO,
         subject: asuntoCorreo,
         html: cuerpoHTML
