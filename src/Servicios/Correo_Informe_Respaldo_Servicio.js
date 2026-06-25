@@ -2,23 +2,17 @@ const nodemailer = require('nodemailer');
 const { DateTime } = require('luxon');
 const dns = require('dns');
 
-// ✅ Fuerza IPv4 de forma absoluta, sin depender de variables externas
 const transportadorCorreo = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
-    port: process.env.SMTP_PORT,
-    secure: process.env.SMTP_SECURE === 'true',
+    port: Number(process.env.SMTP_PORT),
+    secure: false,
     auth: {
         user: process.env.SMTP_USUARIO,
         pass: process.env.SMTP_CLAVE
     },
-    family: 4,
-    dnsTimeout: 10000,
-    connectionTimeout: 15000,
-    // 👇 Esto es lo que garantiza que busque SOLO IPv4
-    lookup: (hostname, options, callback) => {
-        options.family = 4;
-        dns.lookup(hostname, options, callback);
-    }
+    connectionTimeout: 20000,
+    greetingTimeout: 15000,
+    socketTimeout: 20000
 });
 
 const Correo_Informe_respaldo = async (resumen) => {
