@@ -1,10 +1,4 @@
 require('dotenv').config();
-
-// ✅ AQUÍ VA PRIMERO: Se activa si tienes DNS_PARA_IPV4 = true en Railway
-if (process.env.DNS_PARA_IPV4 === 'true') {
-  process.env.NODE_OPTIONS = '--dns-result-order=ipv4first';
-}
-
 process.env.TZ = 'UTC';
 
 const os = require('os');
@@ -21,7 +15,6 @@ const MESES_A_MANTENER = 12;
 
 const EvaluarYProcesarMesAntiguo = async () => {
   const fechaActual = DateTime.now().setZone('America/Guatemala');
-
   const mesLimite = fechaActual.minus({ months: MESES_A_MANTENER }).startOf('month');
   const mesAProcesar = mesLimite.minus({ months: 1 });
 
@@ -31,7 +24,6 @@ const EvaluarYProcesarMesAntiguo = async () => {
 
   try {
     console.log(`🔍 Revisando si hay datos antiguos para: ${nombreMes} ${anio}`);
-
     const tieneDatos = await ServicioBackup.ExistenRegistrosPorMes(anio, mes);
 
     if (!tieneDatos) {
@@ -43,22 +35,13 @@ const EvaluarYProcesarMesAntiguo = async () => {
 
     console.log(`📤 Encontrados datos antiguos, generando respaldo de ${nombreMes} ${anio}`);
     const respaldoMes = await ServicioBackup.RespaldoPorMes(anio, mes);
-
     const rutaCarpeta = `${process.env.CARPETA_GRUPO || 'Sastrerias'}/${process.env.NOMBRE_EMPRESA || 'EMPRESA_SIN_NOMBRE'}/Respaldos Mensuales Antiguos/${anio}/${mes.toString().padStart(2, '0')} - ${nombreMes.toUpperCase()}`;
     const idCarpeta = await ServicioDrive.ObtenerOCrearRutaCarpeta(rutaCarpeta);
+    const archivoSubido = await ServicioDrive.SubirArchivoEnCarpeta(respaldoMes.nombreArchivo, respaldoMes.contenidoSQL, idCarpeta);
 
-    const archivoSubido = await ServicioDrive.SubirArchivoEnCarpeta(
-      respaldoMes.nombreArchivo,
-      respaldoMes.contenidoSQL,
-      idCarpeta
-    );
-
-    if (!archivoSubido.exito) {
-      throw new Error(`Error al subir: ${archivoSubido.error}`);
-    }
+    if (!archivoSubido.exito) throw new Error(`Error al subir: ${archivoSubido.error}`);
 
     const resultadoBorrado = await ServicioBackup.BorrarDatosPorMes(anio, mes);
-
     return {
       procesado: true,
       nombreMes,
@@ -70,32 +53,18 @@ const EvaluarYProcesarMesAntiguo = async () => {
     };
 
   } catch (error) {
-    return {
-      procesado: false,
-      error: true,
-      mensaje: `❌ Error al procesar mes ${nombreMes} ${anio}: ${error.message}`
-    };
+    return { procesado: false, error: true, mensaje: `❌ Error al procesar mes ${nombreMes} ${anio}: ${error.message}` };
   }
 };
 
 
-cron.schedule('*/1 * * * *', async () => { //Para pruebas de 1 minuto
-// cron.schedule('0 4 * * *', async () => {
+cron.schedule('*/1 * * * *', async () => {
   try {
-
     const { contenidoSQL, nombreArchivo, resumen } = await ServicioBackup.RespaldoCompleto();
     const archivoSubido = await ServicioDrive.SubirArchivoRespaldo(nombreArchivo, contenidoSQL);
-
-    resumen.subida_drive = archivoSubido.exito
-      ? `EXITOSA | ID: ${archivoSubido.id}`
-      : `FALLIDA | ${archivoSubido.error || 'Sin detalles'}`;
-
-    const resultadoRevision = await EvaluarYProcesarMesAntiguo();
-
-    resumen.revision_mes_antiguo = resultadoRevision;
-
+    resumen.subida_drive = archivoSubido.exito ? `EXITOSA | ID: ${archivoSubido.id}` : `FALLIDA | ${archivoSubido.error || 'Sin detalles'}`;
+    resumen.revision_mes_antiguo = await EvaluarYProcesarMesAntiguo();
     await Correo_Informe_respaldo(resumen);
-
   } catch (error) {
     const resumenError = {
       fecha: DateTime.now().setZone('America/Guatemala').toFormat('yyyy-MM-dd HH:mm:ss'),
@@ -107,6 +76,7 @@ cron.schedule('*/1 * * * *', async () => { //Para pruebas de 1 minuto
     await Correo_Informe_respaldo(resumenError);
   }
 }, { timezone: "America/Guatemala" });
+
 
 const networkInterfaces = os.networkInterfaces();
 let ipLocal = 'localhost';

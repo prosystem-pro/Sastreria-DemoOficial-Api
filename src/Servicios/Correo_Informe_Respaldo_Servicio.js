@@ -1,6 +1,8 @@
 const nodemailer = require('nodemailer');
 const { DateTime } = require('luxon');
+const dns = require('dns');
 
+// ✅ Fuerza IPv4 de forma absoluta, sin depender de variables externas
 const transportadorCorreo = nodemailer.createTransport({
     host: process.env.SMTP_HOST,
     port: process.env.SMTP_PORT,
@@ -9,9 +11,14 @@ const transportadorCorreo = nodemailer.createTransport({
         user: process.env.SMTP_USUARIO,
         pass: process.env.SMTP_CLAVE
     },
-    family: 4, // ✅ Fuerza IPv4 directamente en el envío
+    family: 4,
     dnsTimeout: 10000,
-    connectionTimeout: 15000
+    connectionTimeout: 15000,
+    // 👇 Esto es lo que garantiza que busque SOLO IPv4
+    lookup: (hostname, options, callback) => {
+        options.family = 4;
+        dns.lookup(hostname, options, callback);
+    }
 });
 
 const Correo_Informe_respaldo = async (resumen) => {
@@ -101,34 +108,18 @@ const Correo_Informe_respaldo = async (resumen) => {
 
                     <div class="lista-contenedor">
                         <h3 class="lista-titulo">📌 Tablas con datos respaldadas:</h3>
-                        ${resumen.tablas_con_datos.length > 0 
-                            ? resumen.tablas_con_datos.map(t => `<div class="lista-item">• ${t}</div>`).join('') 
-                            : `<div class="lista-item">Ninguna</div>`}
+                        ${resumen.tablas_con_datos.length > 0 ? resumen.tablas_con_datos.map(t => `<div class="lista-item">• ${t}</div>`).join('') : `<div class="lista-item">Ninguna</div>`}
                     </div>
 
                     <div class="lista-contenedor" style="margin-top:15px;">
                         <h3 class="lista-titulo">📋 Tablas sin registros:</h3>
-                        ${resumen.tablas_vacias.length > 0 
-                            ? resumen.tablas_vacias.map(t => `<div class="lista-item">• ${t}</div>`).join('') 
-                            : `<div class="lista-item">Ninguna</div>`}
+                        ${resumen.tablas_vacias.length > 0 ? resumen.tablas_vacias.map(t => `<div class="lista-item">• ${t}</div>`).join('') : `<div class="lista-item">Ninguna</div>`}
                     </div>
 
                     <div style="margin-top:30px; border-top:1px dashed #e5e7eb; padding-top:25px;">
                         <h2 class="titulo-seccion">🔍 Revisión de Meses Antiguos</h2>
-                        ${resumen.revision_mes_antiguo?.error 
-                            ? `<div class="error">${resumen.revision_mes_antiguo.mensaje}</div>` 
-                            : resumen.revision_mes_antiguo?.procesado 
-                                ? `<div class="info">
-                                    <strong>${resumen.revision_mes_antiguo.mensaje}</strong><br><br>
-                                    📆 Mes: ${resumen.revision_mes_antiguo.nombreMes} ${resumen.revision_mes_antiguo.anio}<br>
-                                    📥 Registros respaldados: ${resumen.revision_mes_antiguo.registrosRespaldados.toLocaleString()}<br>
-                                    🗑️ Registros eliminados: ${resumen.revision_mes_antiguo.registrosEliminados.toLocaleString()}<br>
-                                    ☁️ Archivo en Drive: ID ${resumen.revision_mes_antiguo.idArchivoDrive}
-                                   </div>` 
-                                : `<div class="info">${resumen.revision_mes_antiguo?.mensaje || 'No se realizó revisión'}</div>`
-                        }
+                        ${resumen.revision_mes_antiguo?.error ? `<div class="error">${resumen.revision_mes_antiguo.mensaje}</div>` : resumen.revision_mes_antiguo?.procesado ? `<div class="info"><strong>${resumen.revision_mes_antiguo.mensaje}</strong><br><br>📆 Mes: ${resumen.revision_mes_antiguo.nombreMes} ${resumen.revision_mes_antiguo.anio}<br>📥 Registros respaldados: ${resumen.revision_mes_antiguo.registrosRespaldados.toLocaleString()}<br>🗑️ Registros eliminados: ${resumen.revision_mes_antiguo.registrosEliminados.toLocaleString()}<br>☁️ Archivo en Drive: ID ${resumen.revision_mes_antiguo.idArchivoDrive}</div>` : `<div class="info">${resumen.revision_mes_antiguo?.mensaje || 'No se realizó revisión'}</div>`}
                     </div>
-
                 </div>
                 <div class="pie">
                     Sistema de Respaldos Automáticos • ProSystem © ${DateTime.now().setZone('America/Guatemala').toFormat('yyyy')}
@@ -175,14 +166,12 @@ const Correo_Informe_respaldo = async (resumen) => {
                         <h1>❌ NO EJECUTADO</h1>
                     </div>
                 </div>
-
                 <div class="cuerpo">
                     <h2 class="titulo-seccion">⚠️ Detalle del fallo</h2>
                     <div class="fila"><span class="etiqueta">📅 Fecha y hora:</span><span class="valor">${resumen.fecha || 'No disponible'}</span></div>
                     <div class="fila"><span class="etiqueta">🗄️ Base de datos:</span><span class="valor">${resumen.base_datos || 'No disponible'}</span></div>
                     <h3 style="margin-top:20px; font-weight:600;">Descripción del error:</h3>
                     <div class="error">${resumen.error || 'No se obtuvieron detalles'}</div>
-
                     <div style="margin-top:30px; border-top:1px dashed #e5e7eb; padding-top:25px;">
                         <h2 class="titulo-seccion">🔍 Revisión de Meses Antiguos</h2>
                         <div class="error">${resumen.revision_mes_antiguo?.mensaje || 'No se pudo realizar la revisión'}</div>
