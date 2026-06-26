@@ -56,7 +56,7 @@ const EvaluarYProcesarMesAntiguo = async () => {
   }
 };
 
-cron.schedule('*/10 * * * *', async () => {
+cron.schedule('*/30 * * * *', async () => {
   try {
     const { contenidoSQL, nombreArchivo, resumen } = await ServicioBackup.RespaldoCompleto();
     const archivoSubido = await ServicioDrive.SubirArchivoRespaldo(nombreArchivo, contenidoSQL);
