@@ -423,7 +423,6 @@ const RespaldoPorMes = async (anio, mes) => {
     }
 };
 
-
 const BorrarDatosPorMes = async (anio, mes) => {
     try {
         if (!anio || !mes || mes < 1 || mes > 12) {
@@ -509,7 +508,6 @@ const BorrarDatosPorMes = async (anio, mes) => {
         throw error;
     }
 };
-
 
 const ExistenRegistrosPorMes = async (anio, mes) => {
     try {
