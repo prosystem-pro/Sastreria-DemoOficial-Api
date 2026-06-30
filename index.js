@@ -14,8 +14,12 @@ const MESES_A_MANTENER = 12;
 
 const EvaluarYProcesarMesAntiguo = async () => {
   const fechaActual = DateTime.now().setZone('America/Guatemala');
-  const mesLimite = fechaActual.minus({ months: MESES_A_MANTENER }).startOf('month');
-  const mesAProcesar = mesLimite.minus({ months: 1 });
+
+  const mesActual = fechaActual.startOf('month');
+
+  const mesLimite = mesActual.minus({ months: MESES_A_MANTENER });
+
+  const mesAProcesar = mesLimite;
 
   const anio = mesAProcesar.year;
   const mes = mesAProcesar.month;
@@ -56,7 +60,6 @@ const EvaluarYProcesarMesAntiguo = async () => {
   }
 };
 
-// cron.schedule('*/30 * * * *', async () => { 30 minutos prueba
 cron.schedule('0 4 * * *', async () => {
   try {
     const { contenidoSQL, nombreArchivo, resumen } = await ServicioBackup.RespaldoCompleto();
