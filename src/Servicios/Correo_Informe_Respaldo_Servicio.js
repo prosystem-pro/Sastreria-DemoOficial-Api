@@ -2,35 +2,36 @@ const { DateTime } = require('luxon');
 const axios = require('axios');
 
 const Correo_Informe_respaldo = async (resumen) => {
-    let asuntoCorreo, cuerpoHTML;
+    try {
+        let asuntoCorreo, cuerpoHTML;
 
-    const totalEncontradas = resumen.tablas_procesadas + resumen.tablas_vacias?.length;
-    const hayAlerta = totalEncontradas < resumen.total_tablas_encontradas;
-    const colorEstadoDiario = hayAlerta ? '#f59e0b' : '#059669';
-    const tituloDiario = hayAlerta ? '⚠️ RESPALDO DIARIO<br>CON ADVERTENCIAS' : '✅ RESPALDO DIARIO<br>EXITOSO';
+        const totalEncontradas = resumen.tablas_procesadas + resumen.tablas_vacias?.length;
+        const hayAlerta = totalEncontradas < resumen.total_tablas_encontradas;
+        const colorEstadoDiario = hayAlerta ? '#f59e0b' : '#059669';
+        const tituloDiario = hayAlerta ? '⚠️ RESPALDO DIARIO<br>CON ADVERTENCIAS' : '✅ RESPALDO DIARIO<br>EXITOSO';
 
-    let tituloMesesAntiguos = '';
-    let colorEstadoMeses = '#9ca3af';
-    if (resumen.revision_mes_antiguo) {
-        if (resumen.revision_mes_antiguo.error) {
-            tituloMesesAntiguos = '❌ MESES ANTIGUOS<br>ERROR';
-            colorEstadoMeses = '#dc2626';
-        } else if (resumen.revision_mes_antiguo.procesado) {
-            tituloMesesAntiguos = '✅ MESES ANTIGUOS<br>RESPALDADO Y ELIMINADO';
-            colorEstadoMeses = '#059669';
+        let tituloMesesAntiguos = '';
+        let colorEstadoMeses = '#9ca3af';
+        if (resumen.revision_mes_antiguo) {
+            if (resumen.revision_mes_antiguo.error) {
+                tituloMesesAntiguos = '❌ MESES ANTIGUOS<br>ERROR';
+                colorEstadoMeses = '#dc2626';
+            } else if (resumen.revision_mes_antiguo.procesado) {
+                tituloMesesAntiguos = '✅ MESES ANTIGUOS<br>RESPALDADO Y ELIMINADO';
+                colorEstadoMeses = '#059669';
+            } else {
+                tituloMesesAntiguos = 'ℹ️ MESES ANTIGUOS<br>SIN DATOS';
+                colorEstadoMeses = '#3b82f6';
+            }
         } else {
-            tituloMesesAntiguos = 'ℹ️ MESES ANTIGUOS<br>SIN DATOS';
-            colorEstadoMeses = '#3b82f6';
+            tituloMesesAntiguos = 'ℹ️ MESES ANTIGUOS<br>SIN REVISIÓN';
         }
-    } else {
-        tituloMesesAntiguos = 'ℹ️ MESES ANTIGUOS<br>SIN REVISIÓN';
-    }
 
-    const nombreEmpresa = process.env.NOMBRE_EMPRESA || 'EMPRESA';
-    asuntoCorreo = `${hayAlerta ? '⚠️' : '✅'} ${nombreEmpresa} | Respaldo Diario | ${resumen.fecha_inicio}`;
+        const nombreEmpresa = process.env.NOMBRE_EMPRESA || 'EMPRESA';
+        asuntoCorreo = `${hayAlerta ? '⚠️' : '✅'} ${nombreEmpresa} | Respaldo Diario | ${resumen.fecha_inicio}`;
 
-    if (resumen.estado === 'EXITOSO') {
-        cuerpoHTML = `
+        if (resumen.estado === 'EXITOSO') {
+            cuerpoHTML = `
         <!DOCTYPE html>
         <html lang="es">
         <head>
@@ -108,8 +109,8 @@ const Correo_Informe_respaldo = async (resumen) => {
         </body>
         </html>
         `;
-    } else {
-        cuerpoHTML = `
+        } else {
+            cuerpoHTML = `
         <!DOCTYPE html>
         <html lang="es">
         <head>
@@ -164,10 +165,10 @@ const Correo_Informe_respaldo = async (resumen) => {
         </body>
         </html>
         `;
-    }
+        }
 
-    // ✅ ENVÍO SOLO POR API BREVO
-    try {
+        // ✅ ENVÍO SOLO POR API BREVO
+
         const respuesta = await axios.post(
             'https://api.brevo.com/v3/smtp/email',
             {
@@ -184,10 +185,9 @@ const Correo_Informe_respaldo = async (resumen) => {
                 timeout: 25000
             }
         );
-        console.log('✅ Correo enviado correctamente por API Brevo');
         return respuesta.data;
     } catch (err) {
-        console.error('❌ Error enviando correo:', err.response?.data || err.message);
+       
         throw err;
     }
 };

@@ -60,21 +60,15 @@ const ListadoNombreTelaCompleto = async () => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError(
-            'Error al obtener listado de telas',
-            500,
-            'Error'
-        );
+        throw error;
     }
 };
 const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuario) => {
+    let Transaccion;
 
-    const Transaccion = await BaseDatos.transaction();
 
     try {
-
+        Transaccion = await BaseDatos.transaction();
         const {
             CodigoProducto,
             CodigoTipoProducto,
@@ -175,7 +169,9 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
 
     } catch (error) {
 
-        await Transaccion.rollback();
+        if (Transaccion) {
+            try { await Transaccion.rollback(); } catch (_) { }
+        }
         throw error;
 
     }
@@ -192,10 +188,9 @@ const NormalizarNombre = (texto) => {
         .replace(/\b\w/g, c => c.toUpperCase());
 };
 const CrearProductoInventario = async (Datos, CodigoUsuario) => {
-    const Transaccion = await BaseDatos.transaction();
-
+    let Transaccion;
     try {
-
+        Transaccion = await BaseDatos.transaction();
         const {
             CodigoTipoProducto,
             CodigoTipoTela,
@@ -307,12 +302,13 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
 
     } catch (error) {
 
-        await Transaccion.rollback();
+        if (Transaccion) {
+            try { await Transaccion.rollback(); } catch (_) { }
+        }
         throw error;
 
     }
 };
-
 const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
     try {
         if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
@@ -376,13 +372,6 @@ const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
         throw error;
     }
 };
-
-
-module.exports = {
-    NormalizarNombre
-};
-//CORREGIDOS
-
 const ObtenerInventarioListado = async (CodigoEmpresa) => {
     try {
         if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
@@ -438,16 +427,14 @@ const ObtenerInventarioListado = async (CodigoEmpresa) => {
         return Object.values(agrupado);
 
     } catch (error) {
-        console.error('Error en ObtenerInventarioListado:', error);
         throw error;
     }
 };
-
-
 const CrearVariacionInventario = async (Datos, CodigoUsuario) => {
-    const Transaccion = await BaseDatos.transaction();
 
+    let Transaccion;
     try {
+        Transaccion = await BaseDatos.transaction();
         const {
             CodigoProducto,
             CodigoTipoProducto,
@@ -522,12 +509,13 @@ const CrearVariacionInventario = async (Datos, CodigoUsuario) => {
         return InventarioDB;
 
     } catch (error) {
-        await Transaccion.rollback();
+        if (Transaccion) {
+            try { await Transaccion.rollback(); } catch (_) { }
+        }
         throw error;
+
     }
 };
-
-
 const ObtenerInventarioEliminados = async (CodigoEmpresa) => {
     try {
         if (!CodigoEmpresa) LanzarError('Empresa es requerida', 400);
@@ -586,14 +574,14 @@ const ObtenerInventarioEliminados = async (CodigoEmpresa) => {
         return Object.values(agrupado);
 
     } catch (error) {
-        console.error('Error en ObtenerInventarioEliminados:', error);
         throw error;
     }
 };
 const EliminarInventario = async (CodigoInventario, CodigoUsuario) => {
-    const Transaccion = await BaseDatos.transaction();
 
+    let Transaccion;
     try {
+        Transaccion = await BaseDatos.transaction();
         if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
         if (!CodigoUsuario) LanzarError('Usuario es requerido', 400);
 
@@ -637,15 +625,18 @@ const EliminarInventario = async (CodigoInventario, CodigoUsuario) => {
         return { mensaje: 'Inventario eliminado correctamente', CodigoInventario };
 
     } catch (error) {
-        await Transaccion.rollback();
+        if (Transaccion) {
+            try { await Transaccion.rollback(); } catch (_) { }
+        }
         throw error;
+
     }
 };
-
 const RestaurarInventario = async (CodigosInventario, CodigoUsuario) => {
-    const Transaccion = await BaseDatos.transaction();
 
+    let Transaccion;
     try {
+        Transaccion = await BaseDatos.transaction();
         // =========================
         // 1. Validaciones
         // =========================
@@ -698,14 +689,13 @@ const RestaurarInventario = async (CodigosInventario, CodigoUsuario) => {
         return { mensaje: 'Inventario(s) restaurado(s) correctamente', CodigosInventario: CodigosArray };
 
     } catch (error) {
-        await Transaccion.rollback();
+        if (Transaccion) {
+            try { await Transaccion.rollback(); } catch (_) { }
+        }
         throw error;
+
     }
 };
-//FINAL CORREGIDOS
-
-
-
 // LISTADO PRODUCTOS
 const ListadoProducto = async () => {
     try {
@@ -757,7 +747,6 @@ const ListadoTipoTela = async () => {
         throw error;
     }
 };
-
 const ListadoNombreTela = async (CodigoTipoTela) => {
     try {
 
@@ -786,7 +775,6 @@ const ListadoNombreTela = async (CodigoTipoTela) => {
         throw error;
     }
 };
-
 // CREAR
 const CrearTipoTela = async (data) => {
     try {
@@ -822,7 +810,6 @@ const CrearTipoTela = async (data) => {
         throw error;
     }
 };
-
 const CrearTela = async (data) => {
     try {
 
@@ -919,7 +906,6 @@ const ObtenerTelaPorCodigo = async (codigo) => {
         throw error;
     }
 };
-
 // EDITAR
 const EditarTipoTela = async (codigo, data) => {
     try {
@@ -956,7 +942,6 @@ const EditarTipoTela = async (codigo, data) => {
         throw error;
     }
 };
-
 const EditarTela = async (codigo, data) => {
     try {
 
@@ -1001,8 +986,7 @@ const EditarTela = async (codigo, data) => {
         };
 
     } catch (error) {
-        console.error(error);
-        throw error;
+ throw error; 
     }
 };
 // ELIMINAR
@@ -1034,7 +1018,6 @@ const EliminarTipoTela = async (codigo) => {
         throw error;
     }
 };
-
 const EliminarTela = async (codigo) => {
     try {
 
@@ -1076,6 +1059,7 @@ module.exports = {
     ObtenerTipoTelaPorCodigo,
     CrearTela, ListadoNombreTelaCompleto,
     EditarTela, ListadoProducto,
-    ObtenerTelaPorCodigo, CrearVariacionInventario
+    ObtenerTelaPorCodigo, CrearVariacionInventario,
+    NormalizarNombre
 
 };

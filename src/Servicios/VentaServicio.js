@@ -34,7 +34,7 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
     try {
 
         if (!CodigoPedido)
-            LanzarError('El código de venta es obligatorio', 400, 'Advertencia');
+            return LanzarError('El código de venta es obligatorio', 400, 'Advertencia');
 
         // ================= EMPRESA =================
         const empresa = await EmpresaModelo.findOne({
@@ -42,13 +42,13 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
         });
 
         if (!empresa)
-            LanzarError('Empresa no encontrada', 404);
+            return LanzarError('Empresa no encontrada', 404);
 
         // ================= VENTA / PEDIDO =================
         const venta = await ObtenerVenta(Number(CodigoPedido));
 
         if (!venta)
-            LanzarError('Venta no encontrada', 404);
+            return LanzarError('Venta no encontrada', 404);
 
         // ================= CLIENTE =================
         const cliente = await ClienteModelo.findOne({
@@ -59,7 +59,7 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
         });
 
         if (!cliente)
-            LanzarError('Cliente no encontrado', 404);
+            return LanzarError('Cliente no encontrado', 404);
 
         // ================= FORMAS DE PAGO =================
         const formasPagoDB = await FormaPago.findAll({
@@ -180,22 +180,15 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError(
-            error.message || 'Error al obtener datos de impresión',
-            error.statusCode || 500,
-            'Error'
-        );
+        throw error;
     }
 };
-
 const ObtenerVenta = async (CodigoPedido) => {
 
     try {
 
         if (!CodigoPedido)
-            LanzarError('Código de venta requerido', 400);
+            return LanzarError('Código de venta requerido', 400);
 
 
         const venta = await PedidoModelo.findOne({
@@ -351,16 +344,9 @@ const ObtenerVenta = async (CodigoPedido) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError(
-            error.message || 'Error al obtener venta',
-            error.statusCode || 500,
-            'Error'
-        );
+        throw error;
     }
 };
-
 // CREAR VENTA (USANDO PEDIDO)
 const CrearVenta = async (datos, usuario) => {
     let transaction;
@@ -368,7 +354,7 @@ const CrearVenta = async (datos, usuario) => {
     try {
 
         if (!usuario)
-            LanzarError('Usuario no autenticado', 401);
+            return LanzarError('Usuario no autenticado', 401);
 
         transaction = await BaseDatos.transaction();
 
@@ -384,16 +370,16 @@ const CrearVenta = async (datos, usuario) => {
         } = datos;
 
         if (!CodigoCliente)
-            LanzarError('Cliente requerido', 400);
+            return LanzarError('Cliente requerido', 400);
 
         if (!CodigoFormaPago)
-            LanzarError('Forma de pago requerida', 400);
+            return LanzarError('Forma de pago requerida', 400);
 
         if (!Productos || Productos.length === 0)
-            LanzarError('Debe agregar productos', 400);
+            return LanzarError('Debe agregar productos', 400);
 
         if (!Pago || Pago <= 0)
-            LanzarError('Pago inválido', 400);
+            return LanzarError('Pago inválido', 400);
 
         const CodigoEmpresa = 1;
 
@@ -407,7 +393,7 @@ const CrearVenta = async (datos, usuario) => {
         );
 
         if (!documentoVenta)
-            LanzarError('No se pudo generar el documento de la venta', 500);
+            return LanzarError('No se pudo generar el documento de la venta', 500);
 
 
         // ==============================
@@ -422,7 +408,7 @@ const CrearVenta = async (datos, usuario) => {
         });
 
         if (!estadoVenta)
-            LanzarError('Estado VENDIDO no configurado', 400);
+            return LanzarError('Estado VENDIDO no configurado', 400);
 
 
         // ==============================
@@ -460,7 +446,7 @@ const CrearVenta = async (datos, usuario) => {
         // ==============================
         for (const item of Productos) {
             if (!Number.isInteger(item.Cantidad) || item.Cantidad <= 0) {
-                LanzarError(`Cantidad inválida en producto ${item.CodigoInventario}`, 400);
+                return LanzarError(`Cantidad inválida en producto ${item.CodigoInventario}`, 400);
             }
             const inventario = await InventarioRelacion.findOne({
                 where: {
@@ -472,20 +458,20 @@ const CrearVenta = async (datos, usuario) => {
             });
 
             if (!inventario)
-                LanzarError(`Producto ${item.CodigoInventario} no existe`, 404);
+                return LanzarError(`Producto ${item.CodigoInventario} no existe`, 404);
 
             if (item.Cantidad > inventario.StockActual) {
-                LanzarError(
+                return LanzarError(
                     `Stock insuficiente del producto ${item.CodigoInventario}. Disponible: ${inventario.StockActual}`,
                     400
                 );
             }
 
             if (!inventario)
-                LanzarError(`Producto ${item.CodigoInventario} no existe`, 404);
+                return LanzarError(`Producto ${item.CodigoInventario} no existe`, 404);
 
             if (inventario.StockActual < item.Cantidad)
-                LanzarError(
+                return LanzarError(
                     `Stock insuficiente del producto ${item.CodigoInventario}`,
                     400
                 );
@@ -562,7 +548,7 @@ const CrearVenta = async (datos, usuario) => {
         );
 
         if (!documentoPago)
-            LanzarError('No se pudo generar el documento de pago', 500);
+            return LanzarError('No se pudo generar el documento de pago', 500);
 
 
         // ==============================
@@ -601,7 +587,7 @@ const CrearVenta = async (datos, usuario) => {
 
             CodigoPago: pagoRegistro.CodigoPago,
 
-            TipoDocumento: documentoVenta.TipoDocumento,  // 🔴 VENTA
+            TipoDocumento: documentoVenta.TipoDocumento,
             CodigoDocumento: CodigoPedido,
             NumeroDocumento: documentoVenta.NumeroDocumento,
 
@@ -637,22 +623,15 @@ const CrearVenta = async (datos, usuario) => {
         if (transaction)
             await transaction.rollback();
 
-        console.error(error);
-
-        LanzarError(
-            error.message || 'Error al crear venta',
-            error.statusCode || 500,
-            'Error'
-        );
+        throw error;
     }
 };
-
 const GenerarPDFVenta = async (CodigoPedido, res) => {
 
     try {
 
         if (!CodigoPedido)
-            LanzarError('El código de venta es obligatorio', 400, 'Advertencia');
+            return LanzarError('El código de venta es obligatorio', 400, 'Advertencia');
 
 
         // ================= EMPRESA =================
@@ -661,14 +640,14 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
         });
 
         if (!empresa)
-            LanzarError('Empresa no encontrada', 404);
+            return LanzarError('Empresa no encontrada', 404);
 
 
         // ================= VENTA =================
         const venta = await ObtenerVenta(Number(CodigoPedido));
 
         if (!venta)
-            LanzarError('Venta no encontrada', 404);
+            return LanzarError('Venta no encontrada', 404);
 
 
         // ================= CLIENTE =================
@@ -680,7 +659,7 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
         });
 
         if (!cliente)
-            LanzarError('Cliente no encontrado', 404);
+            return LanzarError('Cliente no encontrado', 404);
 
 
         // ================= FORMAS DE PAGO =================
@@ -991,15 +970,11 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError(
-            error.message || 'Error al generar PDF de la venta',
-            error.statusCode || 500,
-            'Error'
-        );
+        throw error;
     }
 };
+
+
 // ELIMINAR VENTA
 const EliminarVenta = async (CodigoPedido, usuario) => {
 
@@ -1012,10 +987,10 @@ const EliminarVenta = async (CodigoPedido, usuario) => {
         // =============================
 
         if (!usuario)
-            LanzarError('Usuario no autenticado', 401);
+            return LanzarError('Usuario no autenticado', 401);
 
         if (!CodigoPedido)
-            LanzarError('Código de venta requerido', 400);
+            return LanzarError('Código de venta requerido', 400);
 
 
         // =============================
@@ -1054,7 +1029,7 @@ const EliminarVenta = async (CodigoPedido, usuario) => {
         });
 
         if (!venta)
-            LanzarError('Venta no encontrada', 404);
+            return LanzarError('Venta no encontrada', 404);
 
 
         // =============================
@@ -1080,7 +1055,7 @@ const EliminarVenta = async (CodigoPedido, usuario) => {
             });
 
             if (!inventario)
-                LanzarError(
+                return LanzarError(
                     `Inventario ${detalle.CodigoInventario} no encontrado`,
                     404
                 );
@@ -1111,7 +1086,7 @@ const EliminarVenta = async (CodigoPedido, usuario) => {
                 TipoMovimiento: 'ENTRADA',
                 OrigenMovimiento: 'ELIMINACION_VENTA',
 
-                TipoDocumento: venta.TipoDocumento, // 🔴 VENTA
+                TipoDocumento: venta.TipoDocumento,
                 CodigoDocumento: venta.CodigoPedido,
                 NumeroDocumento: venta.NumeroDocumento,
 
@@ -1138,7 +1113,7 @@ const EliminarVenta = async (CodigoPedido, usuario) => {
 
             where: {
                 CodigoDocumento: CodigoPedido,
-                TipoDocumento: venta.TipoDocumento // 🔴 VENTA
+                TipoDocumento: venta.TipoDocumento
             },
 
             attributes: ['CodigoPago'],
@@ -1234,13 +1209,7 @@ const EliminarVenta = async (CodigoPedido, usuario) => {
         if (transaction)
             await transaction.rollback();
 
-        console.error(error);
-
-        LanzarError(
-            error.message || 'Error al eliminar venta',
-            error.statusCode || 500,
-            'Error'
-        );
+        throw error;
     }
 };
 
@@ -1310,13 +1279,7 @@ const ListadoProducto = async () => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError(
-            'Error al obtener productos',
-            500,
-            'Error'
-        );
+        throw error;
 
     }
 
@@ -1436,13 +1399,7 @@ const ListadoVentas = async (FechaInicio, FechaFin) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError(
-            'Error al obtener listado de ventas',
-            500,
-            'Error'
-        );
+        throw error;
     }
 };
 

@@ -64,7 +64,7 @@ const RespaldoCompleto = async () => {
 
         if (!tablas || tablas.length === 0) {
             resumen.estado = 'ERROR';
-            LanzarError('No se encontraron tablas en la base de datos', 404);
+            return LanzarError('No se encontraron tablas en la base de datos', 404);
         }
 
         for (const { Esquema, Tabla } of tablas) {
@@ -126,7 +126,7 @@ const RespaldoCompleto = async () => {
             error: error.message
         };
         // Lanzamos el error junto con el resumen
-        throw { message: error.message, resumen: resumenError };
+        throw error;
     }
 };
 
@@ -144,7 +144,7 @@ const RestaurarRespaldoCompleto = async (contenidoSQL) => {
     const existeLoteEmpresa = lotes.some(l => l.includes('INSERT INTO [Ad].[Empresa]'));
 
     if (lotes.length === 0) {
-        LanzarError('El archivo SQL no contiene sentencias válidas', 400);
+        return LanzarError('El archivo SQL no contiene sentencias válidas', 400);
     }
 
     const conexion = await BaseDatos.connectionManager.getConnection();
@@ -273,7 +273,7 @@ const RestaurarRespaldoCompleto = async (contenidoSQL) => {
 const RespaldoPorMes = async (anio, mes) => {
     try {
         if (!anio || !mes || mes < 1 || mes > 12) {
-            LanzarError('Debe proporcionar Año y Mes válidos (ej: anio:2025, mes:1)', 400);
+            return LanzarError('Debe proporcionar Año y Mes válidos (ej: anio:2025, mes:1)', 400);
         }
 
         const nombreBD = BaseDatos.config.database;
@@ -419,14 +419,14 @@ const RespaldoPorMes = async (anio, mes) => {
         return { contenidoSQL: sql, nombreArchivo, resumen };
 
     } catch (error) {
-        throw new Error(`ERROR AL GENERAR RESPALDO MENSUAL: ${error.message}`);
+        throw error;
     }
 };
 
 const BorrarDatosPorMes = async (anio, mes) => {
     try {
         if (!anio || !mes || mes < 1 || mes > 12) {
-            LanzarError('Año y Mes inválidos para borrar', 400);
+            return LanzarError('Año y Mes inválidos para borrar', 400);
         }
 
         const conexion = await BaseDatos.connectionManager.getConnection();
@@ -512,7 +512,7 @@ const BorrarDatosPorMes = async (anio, mes) => {
 const ExistenRegistrosPorMes = async (anio, mes) => {
     try {
         if (!anio || !mes || mes < 1 || mes > 12) {
-            LanzarError('Año y mes inválidos para verificar', 400);
+            return LanzarError('Año y mes inválidos para verificar', 400);
         }
 
         const TABLAS_TRANSACCIONALES = [
@@ -576,7 +576,7 @@ const ExistenRegistrosPorMes = async (anio, mes) => {
         return false;
 
     } catch (error) {
-        throw new Error(`Error al verificar registros del mes ${mes}/${anio}: ${error.message}`);
+        throw error;
     }
 };
 
@@ -586,5 +586,5 @@ module.exports = {
     RestaurarRespaldoCompleto,
     RespaldoPorMes,
     BorrarDatosPorMes,
-    ExistenRegistrosPorMes 
+    ExistenRegistrosPorMes
 };

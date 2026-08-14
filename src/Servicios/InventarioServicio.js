@@ -87,16 +87,14 @@ const ObtenerInventarioListado = async (CodigoEmpresa) => {
         return resultado;
 
     } catch (error) {
-        console.error('Error en ObtenerInventarioListado:', error);
         throw error;
     }
 };
 const CrearProductoInventario = async (Datos, CodigoUsuario) => {
 
-    const Transaccion = await BaseDatos.transaction();
-
+    let Transaccion;
     try {
-
+        Transaccion = await BaseDatos.transaction();
         let {
             Producto,
             CodigoTipoProducto,
@@ -257,14 +255,8 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
 
     } catch (error) {
 
-        await Transaccion.rollback();
-
-        if (error.name === 'SequelizeUniqueConstraintError') {
-            LanzarError('Este producto ya existe', 400);
-        }
-
+        try { Transaccion && await Transaccion.rollback(); } catch (_) { }
         throw error;
-
     }
 };
 const NormalizarTexto = (texto) => {
@@ -397,11 +389,11 @@ const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
         throw error;
     }
 };
-
 const RestaurarInventario = async (CodigosInventario, CodigoUsuario) => {
-    const Transaccion = await BaseDatos.transaction();
 
+    let Transaccion;
     try {
+        Transaccion = await BaseDatos.transaction();
         // =========================
         // 1. Validaciones
         // =========================
@@ -454,15 +446,15 @@ const RestaurarInventario = async (CodigosInventario, CodigoUsuario) => {
         return { mensaje: 'Inventario(s) restaurado(s) correctamente', CodigosInventario: CodigosArray };
 
     } catch (error) {
-        await Transaccion.rollback();
+        try { Transaccion && await Transaccion.rollback(); } catch (_) { }
         throw error;
     }
 };
-
 const EliminarInventario = async (CodigoInventario, CodigoUsuario) => {
-    const Transaccion = await BaseDatos.transaction();
 
+    let Transaccion;
     try {
+        Transaccion = await BaseDatos.transaction();
         if (!CodigoInventario) LanzarError('Código de inventario es requerido', 400);
         if (!CodigoUsuario) LanzarError('Usuario es requerido', 400);
 
@@ -506,11 +498,10 @@ const EliminarInventario = async (CodigoInventario, CodigoUsuario) => {
         return { mensaje: 'Inventario eliminado correctamente', CodigoInventario };
 
     } catch (error) {
-        await Transaccion.rollback();
+        try { Transaccion && await Transaccion.rollback(); } catch (_) { }
         throw error;
     }
 };
-
 const ObtenerInventarioEliminados = async (CodigoEmpresa) => {
     try {
 
@@ -598,17 +589,16 @@ const ObtenerInventarioEliminados = async (CodigoEmpresa) => {
 
     } catch (error) {
 
-        console.error('Error en ObtenerInventarioEliminados:', error);
         throw error;
 
     }
 };
 const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuario) => {
 
-    const Transaccion = await BaseDatos.transaction();
+    let Transaccion;
 
     try {
-
+        Transaccion = await BaseDatos.transaction();
         let {
             Producto,
             CodigoTipoProducto,
@@ -787,13 +777,11 @@ const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuar
 
     } catch (error) {
 
-        await Transaccion.rollback();
+        try { Transaccion && await Transaccion.rollback(); } catch (_) { }
         throw error;
 
     }
 };
-
-
 const ListadoTipoProducto = async () => {
     try {
         // Obtenemos todos los tipos de producto activos (Estatus = 1)
@@ -810,8 +798,7 @@ const ListadoTipoProducto = async () => {
         }));
 
     } catch (error) {
-        console.error('Error en ListadoTipoProducto:', error);
-        LanzarError('Error al obtener tipos de producto', 500, 'Error');
+        throw error;
     }
 };
 //LISTADOS
@@ -841,14 +828,11 @@ const ListadoMarca = async () => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError('Error al obtener marcas', 500, 'Error');
+        throw error;
 
     }
 
 };
-
 const ListadoEstilo = async () => {
 
     try {
@@ -875,14 +859,11 @@ const ListadoEstilo = async () => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError('Error al obtener estilos', 500, 'Error');
+        throw error;
 
     }
 
 };
-
 const ListadoTalla = async () => {
 
     try {
@@ -909,14 +890,11 @@ const ListadoTalla = async () => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError('Error al obtener tallas', 500, 'Error');
+        throw error;
 
     }
 
 };
-
 const ListadoColor = async () => {
 
     try {
@@ -943,9 +921,7 @@ const ListadoColor = async () => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError('Error al obtener colores', 500, 'Error');
+        throw error;
 
     }
 
@@ -978,8 +954,6 @@ const CrearMarca = async (NombreMarca) => {
 
     } catch (error) {
 
-        console.error(error);
-
         if (error.name === 'SequelizeUniqueConstraintError') {
             return LanzarError('La marca ya existe', 400, 'Alerta');
         }
@@ -988,7 +962,6 @@ const CrearMarca = async (NombreMarca) => {
     }
 
 };
-
 const CrearEstilo = async (NombreEstilo) => {
 
     try {
@@ -1005,7 +978,6 @@ const CrearEstilo = async (NombreEstilo) => {
 
     } catch (error) {
 
-        console.error(error);
 
         if (error.name === 'SequelizeUniqueConstraintError') {
             return LanzarError('El estilo ya existe', 400, 'Alerta');
@@ -1031,8 +1003,6 @@ const CrearTalla = async (NombreTalla) => {
 
     } catch (error) {
 
-        console.error(error);
-
         if (error.name === 'SequelizeUniqueConstraintError') {
             return LanzarError('La talla ya existe', 400, 'Alerta');
         }
@@ -1041,7 +1011,6 @@ const CrearTalla = async (NombreTalla) => {
     }
 
 };
-
 const CrearColor = async (NombreColor) => {
 
     try {
@@ -1057,8 +1026,6 @@ const CrearColor = async (NombreColor) => {
         };
 
     } catch (error) {
-
-        console.error(error);
 
         if (error.name === 'SequelizeUniqueConstraintError') {
             return LanzarError('El color ya existe', 400, 'Alerta');
@@ -1076,7 +1043,7 @@ const ObtenerMarcaPorCodigo = async (CodigoMarca) => {
         const marca = await MarcaModelo.findByPk(CodigoMarca);
 
         if (!marca) {
-            LanzarError('Marca no encontrada', 404, 'Error');
+            return LanzarError('Marca no encontrada', 404, 'Alerta');
         }
 
         return {
@@ -1086,13 +1053,11 @@ const ObtenerMarcaPorCodigo = async (CodigoMarca) => {
 
     } catch (error) {
 
-        console.error(error);
-        LanzarError('Error al obtener marca', 500, 'Error');
+        throw error;
 
     }
 
 };
-
 const ObtenerEstiloPorCodigo = async (CodigoEstilo) => {
 
     try {
@@ -1100,7 +1065,7 @@ const ObtenerEstiloPorCodigo = async (CodigoEstilo) => {
         const estilo = await EstiloModelo.findByPk(CodigoEstilo);
 
         if (!estilo) {
-            LanzarError('Estilo no encontrado', 404, 'Error');
+            return LanzarError('Estilo no encontrado', 404, 'Alerta');
         }
 
         return {
@@ -1110,13 +1075,11 @@ const ObtenerEstiloPorCodigo = async (CodigoEstilo) => {
 
     } catch (error) {
 
-        console.error(error);
-        LanzarError('Error al obtener estilo', 500, 'Error');
+        throw error;
 
     }
 
 };
-
 const ObtenerTallaPorCodigo = async (CodigoTalla) => {
 
     try {
@@ -1124,7 +1087,7 @@ const ObtenerTallaPorCodigo = async (CodigoTalla) => {
         const talla = await TallaModelo.findByPk(CodigoTalla);
 
         if (!talla) {
-            LanzarError('Talla no encontrada', 404, 'Error');
+            return LanzarError('Talla no encontrada', 404, 'Alerta');
         }
 
         return {
@@ -1134,13 +1097,11 @@ const ObtenerTallaPorCodigo = async (CodigoTalla) => {
 
     } catch (error) {
 
-        console.error(error);
-        LanzarError('Error al obtener talla', 500, 'Error');
+        throw error;
 
     }
 
 };
-
 const ObtenerColorPorCodigo = async (CodigoColor) => {
 
     try {
@@ -1148,7 +1109,7 @@ const ObtenerColorPorCodigo = async (CodigoColor) => {
         const color = await ColorModelo.findByPk(CodigoColor);
 
         if (!color) {
-            LanzarError('Color no encontrado', 404, 'Error');
+            return LanzarError('Color no encontrado', 404, 'Alerta');
         }
 
         return {
@@ -1158,13 +1119,11 @@ const ObtenerColorPorCodigo = async (CodigoColor) => {
 
     } catch (error) {
 
-        console.error(error);
-        LanzarError('Error al obtener color', 500, 'Error');
+        throw error;
 
     }
 
 };
-
 //EDITAR
 const ActualizarMarca = async (CodigoMarca, NombreMarca) => {
 
@@ -1186,8 +1145,6 @@ const ActualizarMarca = async (CodigoMarca, NombreMarca) => {
         };
 
     } catch (error) {
-
-        console.error(error);
 
         if (error.name === 'SequelizeUniqueConstraintError') {
             return LanzarError('La marca ya existe', 400, 'Alerta');
@@ -1218,8 +1175,6 @@ const ActualizarEstilo = async (CodigoEstilo, NombreEstilo) => {
 
     } catch (error) {
 
-        console.error(error);
-
         if (error.name === 'SequelizeUniqueConstraintError') {
             return LanzarError('El estilo ya existe', 400, 'Alerta');
         }
@@ -1228,7 +1183,6 @@ const ActualizarEstilo = async (CodigoEstilo, NombreEstilo) => {
     }
 
 };
-
 const ActualizarTalla = async (CodigoTalla, NombreTalla) => {
 
     try {
@@ -1250,8 +1204,6 @@ const ActualizarTalla = async (CodigoTalla, NombreTalla) => {
 
     } catch (error) {
 
-        console.error(error);
-
         if (error.name === 'SequelizeUniqueConstraintError') {
             return LanzarError('La talla ya existe', 400, 'Alerta');
         }
@@ -1260,7 +1212,6 @@ const ActualizarTalla = async (CodigoTalla, NombreTalla) => {
     }
 
 };
-
 const ActualizarColor = async (CodigoColor, NombreColor) => {
 
     try {
@@ -1281,8 +1232,6 @@ const ActualizarColor = async (CodigoColor, NombreColor) => {
         };
 
     } catch (error) {
-
-        console.error(error);
 
         if (error.name === 'SequelizeUniqueConstraintError') {
             return LanzarError('El color ya existe', 400, 'Alerta');

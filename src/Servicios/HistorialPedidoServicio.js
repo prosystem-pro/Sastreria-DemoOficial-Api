@@ -31,9 +31,8 @@ const { LanzarError } = require('../Utilidades/ErrorServicios');
 const { Op, literal } = require('sequelize');
 
 const CrearPedido = async (datos, usuario, CodigoEmpresa, NombreRol) => {
-    const transaccion = await BaseDatos.transaction();
-
     try {
+        const transaccion = await BaseDatos.transaction();
         if (!CodigoEmpresa)
             LanzarError('La empresa es obligatoria', 400, 'Alerta');
 
@@ -285,25 +284,19 @@ const CrearPedido = async (datos, usuario, CodigoEmpresa, NombreRol) => {
 
     } catch (errorOriginal) {
 
-
         try {
-
+            // ✅ Verifica que exista y no haya terminado
             if (transaccion && !transaccion.finished) {
                 await transaccion.rollback();
             }
-
-        } catch (rollbackError) {
-
-        }
-
+        } catch (rollbackError) { }
         throw errorOriginal;
     }
 };
 const ActualizarPedido = async (datos, usuario, NombreRol) => {
 
-    const transaccion = await BaseDatos.transaction();
-
     try {
+        const transaccion = await BaseDatos.transaction();
         if (!datos.CodigoPedido)
             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
 
@@ -575,9 +568,10 @@ const ActualizarPedido = async (datos, usuario, NombreRol) => {
     } catch (error) {
 
         try {
-            await transaccion.rollback();
+            if (transaccion && !transaccion.finished) {
+                await transaccion.rollback();
+            }
         } catch (_) { }
-
         throw error;
     }
 };
@@ -916,13 +910,7 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
 
     } catch (error) {
 
-        console.error('Error al generar PDF:', error);
-
-        LanzarError(
-            error.message || 'Error al generar el PDF del pedido',
-            error.statusCode || 500,
-            'Error'
-        );
+        throw error;
     }
 };
 const GenerarPDFPagoPedido = async (CodigoPago, res) => {
@@ -1072,8 +1060,7 @@ const GenerarPDFPagoPedido = async (CodigoPago, res) => {
         doc.end();
 
     } catch (error) {
-        console.error('Error al generar PDF de pago:', error);
-        LanzarError(error.message || 'Error al generar PDF de pago del pedido', error.statusCode || 500, 'Error');
+        throw error;
     }
 };
 const ObtenerDatosImpresionPagoPedido = async (CodigoPago) => {
@@ -1191,21 +1178,13 @@ const ObtenerDatosImpresionPagoPedido = async (CodigoPago) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError(
-            error.message || 'Error al obtener datos de impresión de pago',
-            error.statusCode || 500,
-            'Error'
-        );
+        throw error;
     }
 };
 const RegistrarPagoPedido = async (datos, usuario) => {
 
-    const transaccion = await BaseDatos.transaction();
-
     try {
-
+        const transaccion = await BaseDatos.transaction();
         // ================= VALIDACIONES =================
         if (!datos.CodigoPedido)
             LanzarError('El pedido es obligatorio', 400, 'Alerta');
@@ -1361,9 +1340,10 @@ const RegistrarPagoPedido = async (datos, usuario) => {
     } catch (error) {
 
         try {
-            await transaccion.rollback();
+            if (transaccion && !transaccion.finished) {
+                await transaccion.rollback();
+            }
         } catch (_) { }
-
         throw error;
     }
 };
@@ -1594,21 +1574,13 @@ const ObtenerPedido = async (CodigoPedido) => {
 
     } catch (error) {
 
-        console.error('Error original en ObtenerPedido:', error);
-
-        if (!error.statusCode)
-            LanzarError('Error al obtener pedido', 500, 'Error');
-
         throw error;
     }
 };
-
 const EliminarPedido = async (CodigoPedido) => {
 
-    const transaccion = await BaseDatos.transaction();
-
     try {
-
+        const transaccion = await BaseDatos.transaction();
         if (!CodigoPedido)
             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
 
@@ -1666,7 +1638,6 @@ const EliminarPedido = async (CodigoPedido) => {
 
 
                 } catch (err) {
-                    console.log(err);
                     throw err;
                 }
 
@@ -1794,12 +1765,11 @@ const EliminarPedido = async (CodigoPedido) => {
         };
 
     } catch (error) {
-
-        if (transaccion && !transaccion.finished) {
-            await transaccion.rollback();
-        }
-
-        console.error(error);
+        try {
+            if (transaccion && !transaccion.finished) {
+                await transaccion.rollback();
+            }
+        } catch (_) { }
         throw error;
     }
 };
@@ -1881,9 +1851,7 @@ const ListarPagosPorPedido = async (codigoPedido) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError('Error al obtener pagos del pedido', 500, 'Error');
+        throw error;
 
     }
 
@@ -2014,7 +1982,6 @@ const ListadoEntregados = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOt
         throw error;
     }
 };
-
 const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = false, FechaInicio,
     FechaFin,) => {
     try {
@@ -2146,10 +2113,7 @@ const Listado = async (CodigoEmpresa, SuperAdmin, NombreEmpresa, verOtros = fals
         return resultado;
 
     } catch (error) {
-
-        if (error.statusCode) throw error;
-
-        LanzarError('Error al obtener listado de pedidos', 500);
+        throw error;
     }
 };
 const Obtener = async (codigoPedido) => {
@@ -2230,9 +2194,7 @@ const Obtener = async (codigoPedido) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError('Error al obtener pedido', 500, 'Error');
+        throw error;
 
     }
 };
@@ -2271,9 +2233,7 @@ const ListadoTipoProducto = async (NombreRol) => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError('Error al obtener tipos de producto', 500, 'Error');
+throw error;
     }
 };
 const ListadoProducto = async (CodigoTipoProducto = null) => {
@@ -2334,8 +2294,7 @@ const ListadoProducto = async (CodigoTipoProducto = null) => {
         return resultado;
 
     } catch (error) {
-        console.error('[ListadoProducto] Error:', error);
-        LanzarError('Error al obtener productos', 500, 'Error');
+throw error;
     }
 };
 const ListadoVariacionesProducto = async (CodigoProducto) => {
@@ -2400,8 +2359,7 @@ const ListadoVariacionesProducto = async (CodigoProducto) => {
         };
 
     } catch (error) {
-        console.error('[ListadoVariacionesProducto] Error:', error);
-        throw error;
+throw error;
     }
 };
 const ListadoTipoTela = async () => {
@@ -2430,9 +2388,7 @@ const ListadoTipoTela = async () => {
 
     } catch (error) {
 
-        console.error(error);
-
-        LanzarError('Error al obtener tipos de tela', 500, 'Error');
+throw error;
 
     }
 
@@ -2462,10 +2418,7 @@ const ListadoTela = async () => {
         }));
 
     } catch (error) {
-
-        console.error(error);
-
-        LanzarError('Error al obtener nombres de tela', 500, 'Error');
+throw error;
 
     }
 
@@ -2496,8 +2449,7 @@ const ListadoTipoCuello = async () => {
 
     } catch (error) {
 
-        console.error('ERROR ListadoTipoCuello:', error);
-        throw error;
+throw error;
 
     }
 
@@ -2539,9 +2491,7 @@ const ListadoEstadoPedido = async () => {
         }));
 
     } catch (error) {
-
-        console.error('ERROR ListadoEstadoPedido:', error);
-        throw error;
+throw error;
 
     }
 
@@ -2616,7 +2566,7 @@ const ObtenerProducto = async (codigoProducto, codigoTela = null, codigoTipoTela
         };
 
     } catch (error) {
-        throw error;
+throw error;
     }
 };
 const ListadoCliente = async (CodigoEmpresa, SuperAdmin) => {
@@ -2652,8 +2602,7 @@ const ListadoCliente = async (CodigoEmpresa, SuperAdmin) => {
 
     } catch (error) {
 
-        console.error(error);
-        LanzarError('Error al obtener clientes', 500, 'Error');
+throw error;
 
     }
 
@@ -2677,8 +2626,7 @@ const ListadoFormaPago = async () => {
         }));
 
     } catch (error) {
-        console.error(error);
-        LanzarError('Error al obtener formas de pago', 500, 'Error');
+throw error;
     }
 };
 

@@ -7,45 +7,69 @@ const NombreModelo = 'NombrePermiso';
 const CodigoModelo = 'CodigoPermiso';
 
 const Listado = async () => {
-  return await Modelo.findAll({ where: { Estatus: [1, 2] } });
+  try {
+    return await Modelo.findAll({ where: { Estatus: [1, 2] } });
+  } catch (error) {
+    throw error;
+  }
 };
 
 const ObtenerPorCodigo = async (Codigo) => {
-  const registro = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
-  if (!registro) LanzarError('Registro no encontrado', 404);
-  return registro;
+  try {
+    const registro = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
+    if (!registro) return LanzarError('Registro no encontrado', 404);
+    return registro;
+  } catch (error) {
+    throw error;
+  }
 };
 
 const Buscar = async (TipoBusqueda, ValorBusqueda) => {
-  switch (parseInt(TipoBusqueda)) {
-    case 1:
-      return await Modelo.findAll({
-        where: { [NombreModelo]: { [Sequelize.Op.like]: `%${ValorBusqueda}%` }, Estatus: [1, 2] }
-      });
-    case 2:
-      return await Modelo.findAll({ where: { Estatus: [1, 2] }, order: [[NombreModelo, 'ASC']] });
-    default:
-      LanzarError('Tipo de búsqueda inválido', 400);
+  try {
+    switch (parseInt(TipoBusqueda)) {
+      case 1:
+        return await Modelo.findAll({
+          where: { [NombreModelo]: { [Sequelize.Op.like]: `%${ValorBusqueda}%` }, Estatus: [1, 2] }
+        });
+      case 2:
+        return await Modelo.findAll({ where: { Estatus: [1, 2] }, order: [[NombreModelo, 'ASC']] });
+      default:
+        return LanzarError('Tipo de búsqueda inválido', 400);
+    }
+  } catch (error) {
+    throw error;
   }
 };
 
 const Crear = async (Datos) => {
-  if (!Datos || !Datos.NombrePermiso) LanzarError('Datos inválidos para crear registro', 400);
-  return await Modelo.create(Datos);
+  try {
+    if (!Datos || !Datos.NombrePermiso) return LanzarError('Datos inválidos para crear registro', 400);
+    return await Modelo.create(Datos);
+  } catch (error) {
+    throw error;
+  }
 };
 
 const Editar = async (Codigo, Datos) => {
-  const registro = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
-  if (!registro) LanzarError('Registro no encontrado para editar', 404);
-  await registro.update(Datos);
-  return registro;
+  try {
+    const registro = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
+    if (!registro) return LanzarError('Registro no encontrado para editar', 404);
+    await registro.update(Datos);
+    return registro;
+  } catch (error) {
+    throw error;
+  }
 };
 
 const Eliminar = async (Codigo) => {
-  const registro = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
-  if (!registro) LanzarError('Registro no encontrado para eliminar', 404);
-  await registro.destroy();
-  return registro;
+  try {
+    const registro = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
+    if (!registro) return LanzarError('Registro no encontrado para eliminar', 404);
+    await registro.destroy();
+    return registro;
+  } catch (error) {
+    throw error;
+  }
 };
 
 module.exports = { Listado, ObtenerPorCodigo, Buscar, Crear, Editar, Eliminar };

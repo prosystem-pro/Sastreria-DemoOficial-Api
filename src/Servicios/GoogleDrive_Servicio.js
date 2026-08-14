@@ -30,46 +30,54 @@ if (!ID_CARPETA_RAIZ) {
 // =====================================================
 
 const ObtenerOCrearCarpeta = async (drive, nombre, padreId) => {
-    const nombreEscapado = nombre.replace(/'/g, "\\'");
-    const q = `name='${nombreEscapado}' and '${padreId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
+    try {
+        const nombreEscapado = nombre.replace(/'/g, "\\'");
+        const q = `name='${nombreEscapado}' and '${padreId}' in parents and mimeType='application/vnd.google-apps.folder' and trashed=false`;
 
-    const res = await drive.files.list({
-        q,
-        fields: 'files(id)',
-        supportsAllDrives: true,
-        includeItemsFromAllDrives: true
-    });
+        const res = await drive.files.list({
+            q,
+            fields: 'files(id)',
+            supportsAllDrives: true,
+            includeItemsFromAllDrives: true
+        });
 
-    if (res.data.files.length > 0) {
-        return res.data.files[0].id;
+        if (res.data.files.length > 0) {
+            return res.data.files[0].id;
+        }
+
+        const nuevaCarpeta = await drive.files.create({
+            requestBody: {
+                name: nombre,
+                mimeType: 'application/vnd.google-apps.folder',
+                parents: [padreId]
+            },
+            fields: 'id',
+            supportsAllDrives: true
+        });
+
+        return nuevaCarpeta.data.id;
+    } catch (error) {
+        throw error;
     }
-
-    const nuevaCarpeta = await drive.files.create({
-        requestBody: {
-            name: nombre,
-            mimeType: 'application/vnd.google-apps.folder',
-            parents: [padreId]
-        },
-        fields: 'id',
-        supportsAllDrives: true
-    });
-
-    return nuevaCarpeta.data.id;
 };
 
 // =====================================================
 // CREAR RUTA COMPLETA
 // =====================================================
 const ObtenerOCrearRutaCarpeta = async (ruta) => {
-    const drive = google.drive({ version: 'v3', auth: oAuth2Client });
-    const partes = ruta.split('/').filter(parte => parte.trim() !== '');
-    let idPadreActual = ID_CARPETA_RAIZ;
+    try {
+        const drive = google.drive({ version: 'v3', auth: oAuth2Client });
+        const partes = ruta.split('/').filter(parte => parte.trim() !== '');
+        let idPadreActual = ID_CARPETA_RAIZ;
 
-    for (const nombreCarpeta of partes) {
-        idPadreActual = await ObtenerOCrearCarpeta(drive, nombreCarpeta, idPadreActual);
+        for (const nombreCarpeta of partes) {
+            idPadreActual = await ObtenerOCrearCarpeta(drive, nombreCarpeta, idPadreActual);
+        }
+
+        return idPadreActual;
+    } catch (error) {
+        throw error;
     }
-
-    return idPadreActual;
 };
 
 // =====================================================
@@ -92,12 +100,10 @@ const SubirArchivoEnCarpeta = async (nombreArchivo, contenidoSQL, idCarpetaDesti
             supportsAllDrives: true
         });
 
-        console.log(`✅ ARCHIVO SUBIDO | ${respuesta.data.name} | ID: ${respuesta.data.id}`);
         return { exito: true, id: respuesta.data.id, nombre: respuesta.data.name };
 
     } catch (error) {
-        console.error('❌ ERROR AL SUBIR:', error.response?.data || error.message);
-        return { exito: false, error: error.message };
+        throw error;
     }
 };
 
@@ -125,12 +131,10 @@ const SubirArchivoRespaldo = async (nombreArchivo, contenidoSQL) => {
             supportsAllDrives: true
         });
 
-        console.log(`✅ RESPALDO DIARIO SUBIDO | ${respuesta.data.name}`);
         return { exito: true, id: respuesta.data.id, nombre: respuesta.data.name };
 
     } catch (error) {
-        console.error('❌ ERROR RESPALDO DIARIO:', error.response?.data || error.message);
-        return { exito: false, error: error.message };
+        throw error;
     }
 };
 

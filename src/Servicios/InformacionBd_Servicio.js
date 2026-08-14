@@ -59,7 +59,7 @@ const EspacioBD = async () => {
     };
 
   } catch (error) {
-    LanzarError(error.message || 'Error al obtener información de la base de datos', 500);
+    throw error;
   }
 };
 

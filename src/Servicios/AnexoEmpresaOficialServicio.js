@@ -153,17 +153,15 @@ const ListadoPedidoPedidoEmpresaOficial = async ({ CodigoUsuario, CodigoRol }) =
         return resultado;
 
     } catch (error) {
-        console.error(' ERROR REAL EN SERVICIO:', error);
         throw error;
     }
 };
 
 const EliminarPedido = async (CodigoPedido) => {
-
-    const transaccion = await BaseDatos.transaction();
+    let transaccion;
 
     try {
-
+        transaccion = await BaseDatos.transaction();
         if (!CodigoPedido)
             LanzarError('El código de pedido es obligatorio', 400, 'Advertencia');
 
@@ -275,12 +273,9 @@ const EliminarPedido = async (CodigoPedido) => {
         };
 
     } catch (error) {
-
-        try {
-            await transaccion.rollback();
-        } catch (_) { }
-
-        console.error(error);
+        if (transaccion) {
+            try { await transaccion.rollback(); } catch (_) { }
+        }
         throw error;
     }
 };

@@ -10,105 +10,129 @@ const NombreModelo = 'NumeroBoleta';
 const CodigoModelo = 'CodigoPagos';
 
 const Listado = async (Anio) => {
-  const Registros = await Modelo.findAll({
-    where: {
-      Estatus: [1, 2, 3],
-      [Sequelize.Op.and]: Sequelize.where(
-        Sequelize.fn('YEAR', Sequelize.col('FechaVencimientoPago')),
-        Anio
-      )
-    }
-  });
+  try {
+    const Registros = await Modelo.findAll({
+      where: {
+        Estatus: [1, 2, 3],
+        [Sequelize.Op.and]: Sequelize.where(
+          Sequelize.fn('YEAR', Sequelize.col('FechaVencimientoPago')),
+          Anio
+        )
+      }
+    });
 
-  return Registros.map((r) => {
-    const Dato = r.toJSON();
+    return Registros.map((r) => {
+      const Dato = r.toJSON();
 
-    if (Dato.FechaVencimientoPago) {
-      const fecha = DateTime.fromJSDate(new Date(Dato.FechaVencimientoPago), { zone: 'utc' }).plus({ days: 1 });
-      Dato.FechaVencimientoPago = fecha.toISODate(); // YYYY-MM-DD
-    }
+      if (Dato.FechaVencimientoPago) {
+        const fecha = DateTime.fromJSDate(new Date(Dato.FechaVencimientoPago), { zone: 'utc' }).plus({ days: 1 });
+        Dato.FechaVencimientoPago = fecha.toISODate(); // YYYY-MM-DD
+      }
 
-    if (Dato.UrlComprobante) {
-      Dato.UrlComprobante = ConstruirUrlImagen(Dato.UrlComprobante);
-    }
-    return Dato;
-  });
+      if (Dato.UrlComprobante) {
+        Dato.UrlComprobante = ConstruirUrlImagen(Dato.UrlComprobante);
+      }
+      return Dato;
+    });
+  } catch (error) {
+    throw error
+  }
 };
 
 
 const ObtenerPorCodigo = async (Codigo) => {
-  const Registro = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
-  if (!Registro) LanzarError('Registro no encontrado', 404);
+  try {
+    const Registro = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
+    if (!Registro) return LanzarError('Registro no encontrado', 404);
 
-  const Dato = Registro.toJSON();
-  if (Dato.UrlComprobante) Dato.UrlComprobante = ConstruirUrlImagen(Dato.UrlComprobante);
+    const Dato = Registro.toJSON();
+    if (Dato.UrlComprobante) Dato.UrlComprobante = ConstruirUrlImagen(Dato.UrlComprobante);
 
-  return Dato;
+    return Dato;
+  } catch (error) {
+    throw error
+  }
 };
 
 
 const Buscar = async (TipoBusqueda, ValorBusqueda) => {
-  switch (parseInt(TipoBusqueda)) {
-    case 1:
-      return await Modelo.findAll({
-        where: {
-          [NombreModelo]: { [Sequelize.Op.like]: `%${ValorBusqueda}%` },
-          Estatus: [1, 2]
-        }
-      });
-    case 2:
-      return await Modelo.findAll({
-        where: { Estatus: [1, 2] },
-        order: [[NombreModelo, 'ASC']]
-      });
-    default:
-      LanzarError('Tipo de búsqueda no válido', 400);
+  try {
+    switch (parseInt(TipoBusqueda)) {
+      case 1:
+        return await Modelo.findAll({
+          where: {
+            [NombreModelo]: { [Sequelize.Op.like]: `%${ValorBusqueda}%` },
+            Estatus: [1, 2]
+          }
+        });
+      case 2:
+        return await Modelo.findAll({
+          where: { Estatus: [1, 2] },
+          order: [[NombreModelo, 'ASC']]
+        });
+      default:
+        return LanzarError('Tipo de búsqueda no válido', 400);
+    }
+  } catch (error) {
+    throw error
   }
 };
 
 const Crear = async (Datos) => {
-  const Nuevo = await Modelo.create(Datos);
-  const Dato = Nuevo.toJSON();
+  try {
+    const Nuevo = await Modelo.create(Datos);
+    const Dato = Nuevo.toJSON();
 
-  Dato.UrlComprobante = ConstruirUrlImagen(Dato.UrlComprobante);
+    Dato.UrlComprobante = ConstruirUrlImagen(Dato.UrlComprobante);
 
-  return Dato;
+    return Dato;
+  } catch (error) {
+    throw error
+  }
 };
 
 const Editar = async (Codigo, Datos) => {
-  const Objeto = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
-  if (!Objeto) LanzarError('Registro no encontrado para actualizar', 404);
+  try {
+    const Objeto = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
+    if (!Objeto) return LanzarError('Registro no encontrado para actualizar', 404);
 
-  await Objeto.update(Datos);
+    await Objeto.update(Datos);
 
-  const Dato = Objeto.toJSON();
+    const Dato = Objeto.toJSON();
 
-  Dato.UrlComprobante = ConstruirUrlImagen(Dato.UrlComprobante);
+    Dato.UrlComprobante = ConstruirUrlImagen(Dato.UrlComprobante);
 
-  return Dato;
+    return Dato;
+  } catch (error) {
+    throw error
+  }
 };
 
 const Eliminar = async (Codigo) => {
-  const Objeto = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
-  if (!Objeto) LanzarError('Registro no encontrado para eliminar', 404);
+  try {
+    const Objeto = await Modelo.findOne({ where: { [CodigoModelo]: Codigo } });
+    if (!Objeto) return LanzarError('Registro no encontrado para eliminar', 404);
 
-  const CamposImagen = [
-    'UrlComprobante'
-  ];
+    const CamposImagen = [
+      'UrlComprobante'
+    ];
 
-  for (const campo of CamposImagen) {
-    const urlOriginal = Objeto[campo];
-    if (urlOriginal) {
-      const urlConstruida = ConstruirUrlImagen(urlOriginal);
-      try {
-        await EliminarImagen(urlConstruida);
-      } catch {
+    for (const campo of CamposImagen) {
+      const urlOriginal = Objeto[campo];
+      if (urlOriginal) {
+        const urlConstruida = ConstruirUrlImagen(urlOriginal);
+        try {
+          await EliminarImagen(urlConstruida);
+        } catch {
 
+        }
       }
     }
+    await Objeto.destroy();
+    return Objeto;
+  } catch (error) {
+    throw error
   }
-  await Objeto.destroy();
-  return Objeto;
 };
 
 const ObtenerResumenGeneralPagos = async (Anio) => {
@@ -214,8 +238,7 @@ const ObtenerResumenGeneralPagos = async (Anio) => {
       throw error;
     }
 
-    // 🔥 Solo errores inesperados tuyos
-    LanzarError('Error interno en resumen de pagos', 500);
+    throw error
   }
 };
 

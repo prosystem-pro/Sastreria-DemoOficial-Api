@@ -4,10 +4,8 @@ const { LanzarError } = require('../Utilidades/ErrorServicios');
 // 0. LIMPIEZA PARA REPLICA Y DEJEAR VACÍO PARA NUEVO CLIENTE
 const LimpiarBaseDatosReplicaCliente = async (SuperAdmin) => {
 
-    const transaction = await BaseDatos.transaction();
-
     try {
-
+        const transaction = await BaseDatos.transaction();
         const deletes = [
 
             'DELETE FROM Op.PedidoDetalleMedida',
@@ -140,7 +138,7 @@ const LimpiarSoloRegistrosTotal = async (SuperAdmin) => {
             try {
                 // Intento 1: TRUNCATE (es la forma limpia, rápida y reinicia ID)
                 await BaseDatos.query(`TRUNCATE TABLE ${nombre}`);
-            } 
+            }
             catch (errorTruncate) {
                 // Intento 2: Si TRUNCATE falla por alguna regla, usamos DELETE + RESEED
                 await BaseDatos.query(`DELETE FROM ${nombre}`);
@@ -165,8 +163,7 @@ const LimpiarSoloRegistrosTotal = async (SuperAdmin) => {
         };
 
     } catch (error) {
-        console.error('Error general:', error.message);
-        throw new Error(`Proceso fallido: ${error.message}`);
+        throw error;
     }
 };
 
@@ -186,7 +183,7 @@ const VaciarTotalBaseDatos = async (SuperAdmin) => {
             IF @sqlFK <> N'' EXEC sp_executesql @sqlFK;
         `);
 
-       
+
         await BaseDatos.query(`
             DECLARE @sqlAll NVARCHAR(MAX) = N'';
             -- Restricciones de tipo DEFAULT (DF__)
@@ -218,10 +215,10 @@ const VaciarTotalBaseDatos = async (SuperAdmin) => {
 
         for (const tabla of tablas) {
             try {
-               
+
                 await BaseDatos.query(`DROP TABLE ${tabla.NombreTabla};`);
             } catch (errInterno) {
-               
+
             }
         }
 
@@ -236,7 +233,6 @@ const VaciarTotalBaseDatos = async (SuperAdmin) => {
         return { mensaje: 'Base de datos totalmente vacía: todas las tablas, restricciones y esquemas eliminados.' };
 
     } catch (error) {
-        console.error('❌ ERROR EN VACIADO TOTAL:', error.message);
         throw error;
     }
 };

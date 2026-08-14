@@ -10,7 +10,7 @@ const EliminarImagen = async (UrlImagen) => {
 
     await Almacenamiento.file(Ruta).delete();
   } catch (error) {
-
+    throw error;
   }
 };
 

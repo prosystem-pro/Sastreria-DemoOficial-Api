@@ -13,6 +13,7 @@ const {
 } = require('../Utilidades/ConversionFechas');
 
 const { LanzarError } = require('../Utilidades/ErrorServicios');
+
 const ReportePedidos = async (
     FechaInicio,
     FechaFin,
@@ -21,7 +22,6 @@ const ReportePedidos = async (
 
     try {
 
-        // ✅ VALIDAR FECHAS
         if (
             !FechaInicio ||
             !FechaFin ||
@@ -161,16 +161,7 @@ const ReportePedidos = async (
 
     } catch (error) {
 
-        console.error(
-            'Error en ReportePedidos:',
-            error
-        );
-
-        LanzarError(
-            'Error al generar reporte de pedidos',
-            500,
-            'Error'
-        );
+        throw error;
     }
 };
 const ReportePedidosAnexo = async (FechaInicio, FechaFin, CodigoEmpresa) => {
@@ -180,16 +171,12 @@ const ReportePedidosAnexo = async (FechaInicio, FechaFin, CodigoEmpresa) => {
         let filtroPedido = {
             Estatus: 1,
             TipoDocumento: 'PEDIDO',
-            CodigoEmpresa: { [Op.ne]: CodigoEmpresa } // ✅ CAMBIO CLAVE
+            CodigoEmpresa: { [Op.ne]: CodigoEmpresa }
         };
 
-        if (FechaInicio && FechaFin) {
-            filtroPedido.FechaCreacion = {
-                [Op.between]: [
-                    `${FechaInicio} 00:00:00`,
-                    `${FechaFin} 23:59:59`
-                ]
-            };
+        if (FechaInicio && FechaFin && FechaInicio !== 'undefined' && FechaFin !== 'undefined') {
+            const { inicioUTC, finUTC } = RangoGuatemalaAUTC(FechaInicio, FechaFin);
+            filtroPedido.FechaCreacion = { [Op.between]: [inicioUTC, finUTC] };
         }
 
         // ================= TOTAL PEDIDOS =================
@@ -256,13 +243,7 @@ const ReportePedidosAnexo = async (FechaInicio, FechaFin, CodigoEmpresa) => {
 
     } catch (error) {
 
-        console.error('Error en ReportePedidosAnexo:', error);
-
-        LanzarError(
-            'Error al generar reporte de pedidos anexo',
-            500,
-            'Error'
-        );
+        throw error;
     }
 };
 const ReporteVentas = async (FechaInicio, FechaFin) => {
@@ -347,16 +328,7 @@ const ReporteVentas = async (FechaInicio, FechaFin) => {
 
     } catch (error) {
 
-        console.error(
-            'Error en ReporteVentas:',
-            error
-        );
-
-        LanzarError(
-            'Error al generar reporte de ventas',
-            500,
-            'Error'
-        );
+        throw error;
     }
 };
 module.exports = {

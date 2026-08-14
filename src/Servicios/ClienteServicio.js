@@ -9,19 +9,22 @@ const NombreModelo = 'NombreCliente';
 const CodigoModelo = 'CodigoCliente';
 
 const Listado = async (CodigoEmpresa, SuperAdmin) => {
+    try {
+        let where = {
+            Estatus: [1, 2]
+        };
 
-    let where = {
-        Estatus: [1, 2]
-    };
+        if (!SuperAdmin) {
+            where.CodigoEmpresa = CodigoEmpresa;
+        }
 
-    if (!SuperAdmin) {
-        where.CodigoEmpresa = CodigoEmpresa;
+        return await Modelo.findAll({
+            where,
+            order: [[NombreModelo, 'ASC']]
+        });
+    } catch (error) { 
+        throw error;  
     }
-
-    return await Modelo.findAll({
-        where,
-        order: [[NombreModelo, 'ASC']]
-    });
 };
 const Crear = async (datos, CodigoEmpresa) => {
     try {
