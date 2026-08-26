@@ -104,6 +104,7 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
             CodigoColor,
             CodigoBarra,
             Precio,
+            PrecioCosto,
             Stock,
             CodigoEmpresa,
             CodigoCategoria
@@ -133,6 +134,7 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
             LanzarError('Color es requerido', 400);
 
         Precio = NormalizarPrecio(Precio);
+        PrecioCosto = NormalizarPrecio(PrecioCosto);
         Stock = NormalizarStock(Stock);
 
         if (!CodigoEmpresa)
@@ -221,6 +223,7 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
             CodigoColor,
             CodigoBarras: CodigoBarra,
             PrecioVenta: Precio,
+            PrecioCosto: PrecioCosto,
             StockActual: Stock,
             StockMinimo: 0,
             StockMaximo: 0,
@@ -257,6 +260,197 @@ const CrearProductoInventario = async (Datos, CodigoUsuario) => {
 
         try { Transaccion && await Transaccion.rollback(); } catch (_) { }
         throw error;
+    }
+};
+const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuario) => {
+
+    let Transaccion;
+
+    try {
+        Transaccion = await BaseDatos.transaction();
+        let {
+            Producto,
+            CodigoTipoProducto,
+            CodigoMarca,
+            CodigoEstilo,
+            CodigoTalla,
+            CodigoColor,
+            CodigoBarra,
+            Precio,
+            PrecioCosto,
+            Stock,
+            CodigoEmpresa,
+            CodigoCategoria,
+            Estatus
+        } = Datos;
+
+        // =========================
+        // VALIDACIONES
+        // =========================
+        Producto = NormalizarTexto(Producto);
+
+        if (!CodigoInventario)
+            LanzarError('Código de inventario es requerido', 400);
+
+        if (!Producto)
+            LanzarError('Producto es requerido', 400);
+
+        if (!CodigoTipoProducto)
+            LanzarError('Tipo de producto es requerido', 400);
+
+        if (!CodigoMarca)
+            LanzarError('Marca es requerida', 400);
+
+        if (!CodigoEstilo)
+            LanzarError('Diseño es requerido', 400);
+
+        if (!CodigoTalla)
+            LanzarError('Talla es requerida', 400);
+
+        if (!CodigoColor)
+            LanzarError('Color es requerido', 400);
+
+        Precio = NormalizarPrecio(Precio);
+        PrecioCosto = NormalizarPrecio(PrecioCosto);
+        Stock = NormalizarStock(Stock);
+
+        if (!CodigoEmpresa)
+            LanzarError('Empresa es requerida', 400);
+
+        if (!CodigoUsuario)
+            LanzarError('Usuario es requerido', 400);
+
+        if (Estatus === undefined || Estatus === null)
+            LanzarError('Estatus es requerido', 400);
+
+        // =========================
+        // 1. BUSCAR PRODUCTO
+        // =========================
+
+        let ProductoDB = await ProductoModelo.findOne({
+            where: {
+                NombreProducto: Producto,
+                CodigoEmpresa: CodigoEmpresa
+            },
+            transaction: Transaccion
+        });
+
+        // =========================
+        // 2. CREAR O ACTUALIZAR PRODUCTO
+        // =========================
+
+        if (!ProductoDB) {
+
+            ProductoDB = await ProductoModelo.create({
+                CodigoEmpresa,
+                CodigoTipoProducto,
+                CodigoCategoria,
+                NombreProducto: Producto,
+                PrecioBase: Precio,
+                Estatus: 1 // crear siempre activo
+            }, { transaction: Transaccion });
+
+        } else {
+
+            await ProductoDB.update({
+                CodigoTipoProducto,
+                CodigoCategoria,
+                PrecioBase: Precio,
+                Estatus: Estatus
+            }, { transaction: Transaccion });
+
+        }
+
+        // =========================
+        // 3. BUSCAR INVENTARIO
+        // =========================
+
+        const InventarioDB = await InventarioModelo.findOne({
+            where: { CodigoInventario },
+            transaction: Transaccion
+        });
+
+        if (!InventarioDB)
+            LanzarError('Inventario no encontrado', 404);
+
+        // =========================
+        // 4. VALIDAR DUPLICADO
+        // =========================
+
+        const ExisteOtroInventario = await InventarioModelo.findOne({
+            where: {
+                CodigoEmpresa,
+                CodigoProducto: ProductoDB.CodigoProducto,
+                CodigoMarca,
+                CodigoEstilo,
+                CodigoTalla,
+                CodigoColor,
+                CodigoInventario: { [Op.ne]: CodigoInventario }
+            },
+            transaction: Transaccion
+        });
+
+        if (ExisteOtroInventario) {
+            LanzarError(
+                'Otro inventario ya existe con la misma combinación',
+                400
+            );
+        }
+
+        // =========================
+        // 5. ACTUALIZAR INVENTARIO
+        // =========================
+
+        const StockAnterior = InventarioDB.StockActual;
+
+        await InventarioDB.update({
+            CodigoProducto: ProductoDB.CodigoProducto,
+            CodigoMarca,
+            CodigoEstilo,
+            CodigoTalla,
+            CodigoColor,
+            CodigoBarras: CodigoBarra,
+            PrecioVenta: Precio,
+            PrecioCosto: PrecioCosto,
+            StockActual: Stock,
+            Estatus: Estatus
+        }, { transaction: Transaccion });
+
+        // =========================
+        // 6. MOVIMIENTO INVENTARIO
+        // =========================
+
+        if (StockAnterior !== Stock) {
+
+            await MovimientoInventarioModelo.create({
+                CodigoEmpresa,
+                CodigoInventario: InventarioDB.CodigoInventario,
+                TipoMovimiento: 'AJUSTE',
+                OrigenMovimiento: 'ACTUALIZACION',
+                CodigoDocumento: null,
+                Cantidad: Stock,
+                StockAnterior,
+                StockNuevo: Stock,
+                Observacion: 'Actualización de inventario',
+                CodigoUsuario,
+                FechaMovimiento: new Date()
+            }, { transaction: Transaccion });
+
+        }
+
+        // =========================
+        // 7. COMMIT
+        // =========================
+
+        await Transaccion.commit();
+
+        return InventarioDB;
+
+    } catch (error) {
+
+        try { Transaccion && await Transaccion.rollback(); } catch (_) { }
+        throw error;
+
     }
 };
 const NormalizarTexto = (texto) => {
@@ -322,6 +516,7 @@ const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
                 'CodigoInventario',
                 'CodigoBarras',
                 'PrecioVenta',
+                'PrecioCosto',
                 'StockActual',
                 'Estatus',
                 'CodigoEmpresa'
@@ -380,6 +575,7 @@ const ObtenerInventarioPorCodigo = async (CodigoInventario) => {
             Color: Inventario.Color?.NombreColor,
             CodigoBarra: Inventario.CodigoBarras,
             PrecioVenta: Inventario.PrecioVenta,
+            PrecioCosto: Inventario.PrecioCosto,
             StockActual: Inventario.StockActual,
             Estatus: Inventario.Estatus,
             CodigoEmpresa: Inventario.CodigoEmpresa
@@ -593,195 +789,7 @@ const ObtenerInventarioEliminados = async (CodigoEmpresa) => {
 
     }
 };
-const ActualizarProductoInventario = async (CodigoInventario, Datos, CodigoUsuario) => {
 
-    let Transaccion;
-
-    try {
-        Transaccion = await BaseDatos.transaction();
-        let {
-            Producto,
-            CodigoTipoProducto,
-            CodigoMarca,
-            CodigoEstilo,
-            CodigoTalla,
-            CodigoColor,
-            CodigoBarra,
-            Precio,
-            Stock,
-            CodigoEmpresa,
-            CodigoCategoria,
-            Estatus
-        } = Datos;
-
-        // =========================
-        // VALIDACIONES
-        // =========================
-        Producto = NormalizarTexto(Producto);
-
-        if (!CodigoInventario)
-            LanzarError('Código de inventario es requerido', 400);
-
-        if (!Producto)
-            LanzarError('Producto es requerido', 400);
-
-        if (!CodigoTipoProducto)
-            LanzarError('Tipo de producto es requerido', 400);
-
-        if (!CodigoMarca)
-            LanzarError('Marca es requerida', 400);
-
-        if (!CodigoEstilo)
-            LanzarError('Diseño es requerido', 400);
-
-        if (!CodigoTalla)
-            LanzarError('Talla es requerida', 400);
-
-        if (!CodigoColor)
-            LanzarError('Color es requerido', 400);
-
-        Precio = NormalizarPrecio(Precio);
-
-        Stock = NormalizarStock(Stock);
-
-        if (!CodigoEmpresa)
-            LanzarError('Empresa es requerida', 400);
-
-        if (!CodigoUsuario)
-            LanzarError('Usuario es requerido', 400);
-
-        if (Estatus === undefined || Estatus === null)
-            LanzarError('Estatus es requerido', 400);
-
-        // =========================
-        // 1. BUSCAR PRODUCTO
-        // =========================
-
-        let ProductoDB = await ProductoModelo.findOne({
-            where: {
-                NombreProducto: Producto,
-                CodigoEmpresa: CodigoEmpresa
-            },
-            transaction: Transaccion
-        });
-
-        // =========================
-        // 2. CREAR O ACTUALIZAR PRODUCTO
-        // =========================
-
-        if (!ProductoDB) {
-
-            ProductoDB = await ProductoModelo.create({
-                CodigoEmpresa,
-                CodigoTipoProducto,
-                CodigoCategoria,
-                NombreProducto: Producto,
-                PrecioBase: Precio,
-                Estatus: 1 // crear siempre activo
-            }, { transaction: Transaccion });
-
-        } else {
-
-            await ProductoDB.update({
-                CodigoTipoProducto,
-                CodigoCategoria,
-                PrecioBase: Precio,
-                Estatus: Estatus
-            }, { transaction: Transaccion });
-
-        }
-
-        // =========================
-        // 3. BUSCAR INVENTARIO
-        // =========================
-
-        const InventarioDB = await InventarioModelo.findOne({
-            where: { CodigoInventario },
-            transaction: Transaccion
-        });
-
-        if (!InventarioDB)
-            LanzarError('Inventario no encontrado', 404);
-
-        // =========================
-        // 4. VALIDAR DUPLICADO
-        // =========================
-
-        const ExisteOtroInventario = await InventarioModelo.findOne({
-            where: {
-                CodigoEmpresa,
-                CodigoProducto: ProductoDB.CodigoProducto,
-                CodigoMarca,
-                CodigoEstilo,
-                CodigoTalla,
-                CodigoColor,
-                CodigoInventario: { [Op.ne]: CodigoInventario }
-            },
-            transaction: Transaccion
-        });
-
-        if (ExisteOtroInventario) {
-            LanzarError(
-                'Otro inventario ya existe con la misma combinación',
-                400
-            );
-        }
-
-        // =========================
-        // 5. ACTUALIZAR INVENTARIO
-        // =========================
-
-        const StockAnterior = InventarioDB.StockActual;
-
-        await InventarioDB.update({
-            CodigoProducto: ProductoDB.CodigoProducto,
-            CodigoMarca,
-            CodigoEstilo,
-            CodigoTalla,
-            CodigoColor,
-            CodigoBarras: CodigoBarra,
-            PrecioVenta: Precio,
-            StockActual: Stock,
-            Estatus: Estatus
-        }, { transaction: Transaccion });
-
-        // =========================
-        // 6. MOVIMIENTO INVENTARIO
-        // =========================
-
-        if (StockAnterior !== Stock) {
-
-            await MovimientoInventarioModelo.create({
-                CodigoEmpresa,
-                CodigoInventario: InventarioDB.CodigoInventario,
-                TipoMovimiento: 'AJUSTE',
-                OrigenMovimiento: 'ACTUALIZACION',
-                CodigoDocumento: null,
-                Cantidad: Stock,
-                StockAnterior,
-                StockNuevo: Stock,
-                Observacion: 'Actualización de inventario',
-                CodigoUsuario,
-                FechaMovimiento: new Date()
-            }, { transaction: Transaccion });
-
-        }
-
-        // =========================
-        // 7. COMMIT
-        // =========================
-
-        await Transaccion.commit();
-
-        return InventarioDB;
-
-    } catch (error) {
-
-        try { Transaccion && await Transaccion.rollback(); } catch (_) { }
-        throw error;
-
-    }
-};
 const ListadoTipoProducto = async () => {
     try {
         // Obtenemos todos los tipos de producto activos (Estatus = 1)

@@ -331,6 +331,44 @@ const ReporteVentas = async (FechaInicio, FechaFin) => {
         throw error;
     }
 };
+const ReporteCostosVentas = async (FechaInicio, FechaFin) => {
+    try {
+        if (!FechaInicio || !FechaFin || FechaInicio === 'undefined' || FechaFin === 'undefined') {
+            return {
+                CantidadVentas: 0,
+                MontoCostoTotal: 0
+            };
+        }
+
+        let where = {
+            Estatus: 1,
+            TipoDocumento: 'VENTA'
+        };
+
+        const { inicioUTC, finUTC } = RangoGuatemalaAUTC(FechaInicio, FechaFin);
+        where.FechaCreacion = { [Op.between]: [inicioUTC, finUTC] };
+
+        const ventas = await PedidoModelo.findAll({
+            attributes: [
+                [Sequelize.fn('COUNT', Sequelize.col('CodigoPedido')), 'CantidadVentas'],
+                [Sequelize.fn('SUM', Sequelize.col('PrecioCosto')), 'MontoCostoTotal']
+            ],
+            where,
+            raw: true
+        });
+
+        const data = ventas[0] || {};
+        return {
+            CantidadVentas: Number(data.CantidadVentas || 0),
+            MontoCostoTotal: Number(data.MontoCostoTotal || 0)
+        };
+
+    } catch (error) {
+        throw error;
+    }
+};
+
 module.exports = {
-    ReporteVentas, ReportePedidos, ReportePedidosAnexo
+    ReporteVentas, ReportePedidos, ReportePedidosAnexo,
+    ReporteCostosVentas
 };

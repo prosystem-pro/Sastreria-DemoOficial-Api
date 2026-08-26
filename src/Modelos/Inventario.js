@@ -83,6 +83,10 @@ module.exports = function(sequelize, DataTypes) {
       type: DataTypes.STRING(64),
       allowNull: true
     },
+    PrecioCosto: {
+      type: DataTypes.DECIMAL(12,2),
+      allowNull: true
+    },
     PrecioVenta: {
       type: DataTypes.DECIMAL(12,2),
       allowNull: true

@@ -29,6 +29,32 @@ const ReporteVentas = async (req, res) => {
 
     }
 };
+const ReporteCostosVentas = async (req, res) => {
+    try {
+
+        const { FechaInicio, FechaFin } = req.query;
+
+        const Objeto = await Servicio.ReporteCostosVentas(
+            FechaInicio,
+            FechaFin
+        );
+
+        return ResponderExito(
+            res,
+            'Reporte de costos generado correctamente.',
+            Objeto || {}
+        );
+
+    } catch (error) {
+
+        return ManejarError(
+            error,
+            res,
+            'Error al generar el reporte de costos'
+        );
+    }
+};
+
 
 const ReportePedidos = async (req, res) => {
     try {
@@ -40,7 +66,7 @@ const ReportePedidos = async (req, res) => {
         const Objeto = await Servicio.ReportePedidos(
             FechaInicio,
             FechaFin,
-            CodigoEmpresa 
+            CodigoEmpresa
         );
 
         return ResponderExito(
@@ -91,6 +117,7 @@ const ReportePedidosAnexo = async (req, res) => {
 };
 module.exports = {
 
-    ReporteVentas, ReportePedidos, ReportePedidosAnexo
+    ReporteVentas, ReportePedidos, ReportePedidosAnexo,
+    ReporteCostosVentas
 
 };
