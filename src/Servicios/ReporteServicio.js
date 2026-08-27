@@ -452,27 +452,25 @@ const ReporteCostosVentas = async (FechaInicio, FechaFin) => {
 };
 const ReporteGanancia = async (FechaInicio, FechaFin) => {
     try {
-        // ✅ VALIDAR FECHAS
-        if (
-            !FechaInicio ||
-            !FechaFin ||
-            FechaInicio === 'undefined' ||
-            FechaFin === 'undefined'
-        ) {
+        if (!FechaInicio || !FechaFin || FechaInicio === 'undefined' || FechaFin === 'undefined') {
             return {
                 TotalVentaPedido: 0,
-                Contado: { Cantidad: 0, Monto: 0 },
-                Pedido: { Cantidad: 0, Monto: 0 }
+                Distribucion: {
+                    Contado: { Cantidad: 0, Monto: 0 },
+                    Pedido: { Cantidad: 0, Monto: 0, Abonado: 0, Pendiente: 0 }
+                },
+                TotalVendidoVentaPedido: 0,
+                Desglose: { Contado: 0, Pedido: 0 },
+                Costos: { TotalCosto: 0, Ganancia: 0 }
             };
         }
 
         const { inicioUTC, finUTC } = RangoGuatemalaAUTC(FechaInicio, FechaFin);
+        const filtroFechas = { Estatus: 1, FechaCreacion: { [Op.between]: [inicioUTC, finUTC] } };
 
-        const filtroFechas = {
-            Estatus: 1,
-            FechaCreacion: { [Op.between]: [inicioUTC, finUTC] }
-        };
-
+        // ==================================================
+        // VENTAS AL CONTADO
+        // ==================================================
         const ventasContado = await PedidoModelo.findAll({
             attributes: [
                 [Sequelize.fn('COUNT', Sequelize.col('CodigoPedido')), 'Cantidad'],
@@ -482,7 +480,17 @@ const ReporteGanancia = async (FechaInicio, FechaFin) => {
             raw: true
         });
 
-        const pedidos = await PedidoModelo.findAll({
+        // ==================================================
+        // PEDIDOS / CRÉDITO — OBTENER CÓDIGOS + TOTALES
+        // ==================================================
+        const listaPedidos = await PedidoModelo.findAll({
+            attributes: ['CodigoPedido'],
+            where: { ...filtroFechas, TipoDocumento: 'PEDIDO' },
+            raw: true
+        });
+        const codigosPedidos = listaPedidos.map(p => p.CodigoPedido);
+
+        const totalesPedidos = await PedidoModelo.findAll({
             attributes: [
                 [Sequelize.fn('COUNT', Sequelize.col('CodigoPedido')), 'Cantidad'],
                 [Sequelize.fn('SUM', Sequelize.col('Total')), 'Monto']
@@ -491,32 +499,82 @@ const ReporteGanancia = async (FechaInicio, FechaFin) => {
             raw: true
         });
 
-        const dataContado = ventasContado[0] || {};
-        const dataPedido = pedidos[0] || {};
+        // ==================================================
+        // ✅ SUMAR ABONOS DESDE PagoAplicacion
+        //    Campo correcto: MontoAplicado
+        // ==================================================
+        let TotalAbonado = 0;
+        if (codigosPedidos.length > 0) {
+            const sumaAbonos = await PagoAplicacionModelo.findAll({
+                attributes: [
+                    [Sequelize.fn('SUM', Sequelize.col('MontoAplicado')), 'TotalAbonado'] // ✅ CORRECTO
+                ],
+                where: { CodigoDocumento: { [Op.in]: codigosPedidos } },
+                raw: true
+            });
+            TotalAbonado = Number(sumaAbonos[0]?.TotalAbonado || 0);
+        }
 
-        const CantidadContado = Number(dataContado.Cantidad || 0);
-        const MontoContado = Number(dataContado.Monto || 0);
-        const CantidadPedido = Number(dataPedido.Cantidad || 0);
-        const MontoPedido = Number(dataPedido.Monto || 0);
+        // ==================================================
+        // COSTO DE PRODUCTOS
+        // ==================================================
+        const todosPedidos = await PedidoModelo.findAll({
+            attributes: ['CodigoPedido'],
+            where: { ...filtroFechas },
+            raw: true
+        });
+        const listaCodigos = todosPedidos.map(p => p.CodigoPedido);
+
+        const detalles = await PedidoDetalleModelo.findAll({
+            attributes: ['Cantidad', 'CodigoInventario'],
+            where: { CodigoPedido: { [Op.in]: listaCodigos } },
+            raw: true
+        });
+
+        let TotalCosto = 0;
+        for (const item of detalles) {
+            const inventario = await InventarioModelo.findOne({
+                attributes: ['PrecioCosto'],
+                where: { CodigoInventario: item.CodigoInventario },
+                raw: true
+            });
+            TotalCosto += Number(inventario?.PrecioCosto || 0) * Number(item.Cantidad || 0);
+        }
+
+        // ==================================================
+        // ASIGNAR VALORES FINALES
+        // ==================================================
+        const CantidadContado = Number(ventasContado[0]?.Cantidad || 0);
+        const MontoContado = Number(ventasContado[0]?.Monto || 0);
+
+        const CantidadPedido = Number(totalesPedidos[0]?.Cantidad || 0);
+        const MontoPedido = Number(totalesPedidos[0]?.Monto || 0);
+        const Pendiente = MontoPedido - TotalAbonado;
 
         const TotalVentaPedido = CantidadContado + CantidadPedido;
+        const TotalVendidoVentaPedido = MontoContado + MontoPedido;
+        const Ganancia = TotalVendidoVentaPedido - TotalCosto;
 
+        // ==================================================
         return {
             TotalVentaPedido,
-            Contado: {
-                Cantidad: CantidadContado,
-                Monto: MontoContado
+            Distribucion: {
+                Contado: { Cantidad: CantidadContado, Monto: MontoContado },
+                Pedido: { Cantidad: CantidadPedido, Monto: MontoPedido, Abonado: TotalAbonado, Pendiente }
             },
-            Pedido: {
-                Cantidad: CantidadPedido,
-                Monto: MontoPedido
-            }
+            TotalVendidoVentaPedido,
+            Desglose: { Contado: MontoContado, Pedido: MontoPedido },
+            Costos: { TotalCosto, Ganancia }
         };
 
     } catch (error) {
         throw error;
     }
 };
+
+
+
+
 
 
 module.exports = {
