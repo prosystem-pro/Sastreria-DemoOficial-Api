@@ -705,7 +705,7 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
         // ================= LOGO =================
         const logoPath = path.join(
             __dirname,
-            '../public/LogoConfeccionesCreateliFactura.jpeg'
+            '../public/LofoFactura.jpeg'
         );
 
         if (fs.existsSync(logoPath)) {
@@ -982,8 +982,17 @@ const GenerarPDFPagoPedido = async (CodigoPago, res) => {
         doc.lineWidth(1).strokeColor('#bfbfbf');
 
         // ================= LOGO =================
-        const logoPath = path.join(__dirname, '../public/LogoConfeccionesCreateli.png');
-        if (fs.existsSync(logoPath)) doc.image(logoPath, 470, 40, { width: 70 });
+        const logoPath = path.join(
+            __dirname,
+            '../public/LofoFactura.jpeg'
+        );
+
+        if (fs.existsSync(logoPath)) {
+            doc.image(logoPath, 365, 30, {
+                width: 120,
+                height: 80
+            });
+        }
 
         // ================= EMPRESA =================
         doc.fillColor('black')
@@ -1143,7 +1152,7 @@ const ObtenerDatosImpresionPagoPedido = async (CodigoPago) => {
                 nit: empresa.NIT,
                 direccion: empresa.Direccion,
                 telefono: empresa.Telefono,
-                logo: '/public/LogoConfeccionesCreateli.png'
+                logo: '/public/LofoFactura.jpeg'
             },
 
             cliente: {

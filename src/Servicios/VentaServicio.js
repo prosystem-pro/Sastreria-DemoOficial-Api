@@ -136,7 +136,7 @@ const ObtenerDatosImpresion = async (CodigoPedido) => {
                 nit: empresa.NIT,
                 direccion: empresa.Direccion,
                 telefono: empresa.Telefono,
-                logo: '/public/LogoConfeccionesCreateli.png'
+                logo: '/public/LofoFactura.jpeg'
             },
 
             cliente: {
@@ -744,7 +744,7 @@ const GenerarPDFVenta = async (CodigoPedido, res) => {
         // ================= LOGO =================
         const logoPath = path.join(
             __dirname,
-            '../public/LogoConfeccionesCreateliFactura.jpeg'
+            '../public/LofoFactura.jpeg'
         );
 
         if (fs.existsSync(logoPath)) {
