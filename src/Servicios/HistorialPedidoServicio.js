@@ -768,60 +768,99 @@ const GenerarPDFPedido = async (CodigoPedido, res) => {
         doc.text(`Atendió: ${pedido.NombreUsuario}`, 320, inicioY + 55);
         doc.text(`Fecha Entrega: ${fechaEntrega}`, 320, inicioY + 70);
 
-
         // ================= TABLA PRODUCTOS =================
         let y = inicioY + 150;
-        let altoFila = 20;
-        let alturaProductos = (pedido.Productos.length + 1) * altoFila;
+        const altoFilaMinimo = 20;
 
-        doc.roundedRect(40, y, 510, alturaProductos, 6).stroke();
+
+        const anchoCantidad = 60;
+        const anchoTotal = 60;
+        const anchoTablaProductos = 510;
+        const anchoColumnaProducto = anchoTablaProductos - anchoCantidad - anchoTotal;
+
+        const bordeIzquierdo = 40;
+        const bordeDerecho = bordeIzquierdo + anchoTablaProductos;
+        const inicioCantidad = bordeIzquierdo;
+        const inicioProducto = inicioCantidad + anchoCantidad + 5;
+        const inicioTotal = bordeDerecho - anchoTotal;
+
+        const alturasFilas = [];
+        let alturaTotalTabla = altoFilaMinimo;
+
+        pedido.Productos.forEach(prod => {
+            const textoProducto = [
+                prod.NombreProducto,
+                prod.NombreTipoTela,
+                prod.NombreTela
+            ].filter(Boolean).join(' — ');
+
+            const anchoUtil = anchoColumnaProducto - 10;
+            const altoTexto = doc.heightOfString(textoProducto, {
+                width: anchoUtil,
+                lineGap: 2
+            });
+            const altoFilaReal = Math.max(altoFilaMinimo, altoTexto + 10);
+            alturasFilas.push(altoFilaReal);
+            alturaTotalTabla += altoFilaReal;
+        });
+
+        doc.roundedRect(bordeIzquierdo, y, anchoTablaProductos, alturaTotalTabla, 6).stroke();
 
         doc.save()
-            .roundedRect(40, y, 510, altoFila, 6)
+            .roundedRect(bordeIzquierdo, y, anchoTablaProductos, altoFilaMinimo, 6)
             .clip()
-            .rect(40, y, 510, altoFila)
+            .rect(bordeIzquierdo, y, anchoTablaProductos, altoFilaMinimo)
             .fill('#e6e6e6')
             .restore();
 
         doc.font('Helvetica-Bold').fontSize(11);
-
-        doc.text('CANTIDAD', 40, y + 5, {
-            width: 80,
+        doc.text('CANT', inicioCantidad, y + 5, {
+            width: anchoCantidad,
             align: 'center'
         });
-        doc.text('PRODUCTO', 150, y + 5);
-        doc.text('TOTAL', 400, y + 5, { width: 140, align: 'right' });
+        doc.text('PRODUCTO', inicioProducto, y + 5);
+        doc.text('TOTAL', inicioTotal, y + 5, {
+            width: anchoTotal,
+            align: 'center'
+        });
+        y += altoFilaMinimo;
 
-        y += altoFila;
 
         doc.font('Helvetica').fontSize(10);
-
-        pedido.Productos.forEach(prod => {
-
-            doc.moveTo(40, y)
-                .lineTo(550, y)
+        pedido.Productos.forEach((prod, indice) => {
+            const altoFila = alturasFilas[indice];
+            doc.moveTo(bordeIzquierdo, y)
+                .lineTo(bordeDerecho, y)
                 .stroke();
 
-
-            doc.text(String(prod.Cantidad), 40, y + 5, {
-                width: 80,
+            doc.text(String(prod.Cantidad), inicioCantidad, y + 5, {
+                width: anchoCantidad,
                 align: 'center'
             });
 
-            doc.text(prod.NombreProducto, 150, y + 5, {
-                width: 220
+            const textoProducto = [
+                prod.NombreProducto,
+                prod.NombreTipoTela,
+                prod.NombreTela
+            ].filter(Boolean).join(' — ');
+            const anchoUtil = anchoColumnaProducto - 10;
+            doc.text(textoProducto, inicioProducto, y + 5, {
+                width: anchoUtil,
+                lineGap: 2
             });
 
             doc.text(
                 `Q ${prod.Subtotal.toFixed(2)}`,
-                400,
+                inicioTotal,
                 y + 5,
-                { width: 140, align: 'right' }
+                {
+                    width: anchoTotal,
+                    align: 'center'
+                }
             );
 
             y += altoFila;
         });
-
 
         // ================= TOTALES =================
         let totalesY = y + 25;
@@ -2242,7 +2281,7 @@ const ListadoTipoProducto = async (NombreRol) => {
 
     } catch (error) {
 
-throw error;
+        throw error;
     }
 };
 const ListadoProducto = async (CodigoTipoProducto = null) => {
@@ -2303,7 +2342,7 @@ const ListadoProducto = async (CodigoTipoProducto = null) => {
         return resultado;
 
     } catch (error) {
-throw error;
+        throw error;
     }
 };
 const ListadoVariacionesProducto = async (CodigoProducto) => {
@@ -2368,7 +2407,7 @@ const ListadoVariacionesProducto = async (CodigoProducto) => {
         };
 
     } catch (error) {
-throw error;
+        throw error;
     }
 };
 const ListadoTipoTela = async () => {
@@ -2397,7 +2436,7 @@ const ListadoTipoTela = async () => {
 
     } catch (error) {
 
-throw error;
+        throw error;
 
     }
 
@@ -2427,7 +2466,7 @@ const ListadoTela = async () => {
         }));
 
     } catch (error) {
-throw error;
+        throw error;
 
     }
 
@@ -2458,7 +2497,7 @@ const ListadoTipoCuello = async () => {
 
     } catch (error) {
 
-throw error;
+        throw error;
 
     }
 
@@ -2500,7 +2539,7 @@ const ListadoEstadoPedido = async () => {
         }));
 
     } catch (error) {
-throw error;
+        throw error;
 
     }
 
@@ -2575,7 +2614,7 @@ const ObtenerProducto = async (codigoProducto, codigoTela = null, codigoTipoTela
         };
 
     } catch (error) {
-throw error;
+        throw error;
     }
 };
 const ListadoCliente = async (CodigoEmpresa, SuperAdmin) => {
@@ -2611,7 +2650,7 @@ const ListadoCliente = async (CodigoEmpresa, SuperAdmin) => {
 
     } catch (error) {
 
-throw error;
+        throw error;
 
     }
 
@@ -2635,7 +2674,7 @@ const ListadoFormaPago = async () => {
         }));
 
     } catch (error) {
-throw error;
+        throw error;
     }
 };
 
