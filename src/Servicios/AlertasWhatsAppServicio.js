@@ -21,7 +21,7 @@ const LISTA_NUMEROS_DESTINO = process.env.WHATSAPP_NUMERO_DESTINO
   : [];
 
 const VERSAO = process.env.WHATSAPP_VERSAO_API || 'v21.0';
-const HORA_ENVIO = '0 */1 * * * *';
+const HORA_ENVIO = '0 */5 * * * *';
 // const HORA_ENVIO = '0 0 7 * * *';
 
 // ==============================================
