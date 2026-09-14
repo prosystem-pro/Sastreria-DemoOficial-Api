@@ -3,7 +3,7 @@ const axios = require('axios');
 const { Op } = require('sequelize');
 const { DateTime } = require('luxon');
 const BaseDatos = require('../BaseDatos/ConexionBaseDatos');
-const { PedidoModelo, ClienteModelo, EmpresaModelo } = require('../Relaciones/Relaciones');
+const { PedidoModelo, ClienteModelo, EmpresaModelo, EstadoPedidoModelo } = require('../Relaciones/Relaciones');
 const { FormatoFecha } = require('../Utilidades/ConversionFechas');
 
 const ZONA_GUATEMALA = 'America/Guatemala';
@@ -21,7 +21,7 @@ const LISTA_NUMEROS_DESTINO = process.env.WHATSAPP_NUMERO_DESTINO
   : [];
 
 const VERSAO = process.env.WHATSAPP_VERSAO_API || 'v21.0';
-const HORA_ENVIO = '0 */5 * * * *';
+const HORA_ENVIO = '0 */1 * * * *';
 // const HORA_ENVIO = '0 0 7 * * *';
 
 // ==============================================
@@ -95,7 +95,7 @@ const CalcularEstadoVencimiento = (fechaEntregaDB, hoyGuatemala) => {
 };
 
 // ==============================================
-// 🔍 REVISAR PEDIDOS — SOLO AGREGADOS LOS ESPACIOS
+// 🔍 REVISAR PEDIDOS — ALIAS CORREGIDO: CaEstadoPedido
 // ==============================================
 
 const RevisarPedidosPorVencer = async () => {
@@ -103,6 +103,7 @@ const RevisarPedidosPorVencer = async () => {
     const hoyGuatemala = DateTime.now().setZone(ZONA_GUATEMALA);
     const fechaFormateada = hoyGuatemala.toFormat('dd/MM/yyyy');
     console.log('🔍 Revisando pedidos... HOY:', fechaFormateada);
+
     const pedidos = await PedidoModelo.findAll({
       where: {
         Estatus: { [Op.in]: [1, 2, 3, 4] },
@@ -111,7 +112,8 @@ const RevisarPedidosPorVencer = async () => {
       attributes: [
         'CodigoPedido',
         'FechaEntrega',
-        'CodigoEmpresa'
+        'CodigoEmpresa',
+        'CodigoEstadoPedido'
       ],
       include: [
         {
@@ -123,11 +125,24 @@ const RevisarPedidosPorVencer = async () => {
           model: EmpresaModelo,
           as: 'AdEmpresa',
           attributes: ['NombreEmpresa']
+        },
+        // ✅ ALIAS CORREGIDO: CaEstadoPedido
+        {
+          model: EstadoPedidoModelo,
+          as: 'CaEstadoPedido', // ← Este es el alias correcto según tu error
+          attributes: ['NombreEstadoPedido']
         }
       ]
     });
+
     const alertas = [];
     for (const pedido of pedidos) {
+      // ✅ IGNORAR si el estado es "Entregado"
+      const nombreEstado = pedido.CaEstadoPedido?.NombreEstadoPedido || '';
+      if (nombreEstado.trim().toUpperCase() === 'ENTREGADO') {
+        continue; // ⏭️ Saltar pedidos ya entregados
+      }
+
       const estado = CalcularEstadoVencimiento(pedido.FechaEntrega, hoyGuatemala);
       if (estado.diasDiferencia <= 5) {
         alertas.push({
@@ -139,6 +154,7 @@ const RevisarPedidosPorVencer = async () => {
         });
       }
     }
+
     if (alertas.length > 0) {
       const agrupado = {};
       for (const alerta of alertas) {
@@ -148,7 +164,7 @@ const RevisarPedidosPorVencer = async () => {
         agrupado[alerta.NombreEmpresa].push(alerta);
       }
 
-      // ✅ SOLO SE AGREGARON LOS ESPACIOS — TODO LO DEMÁS IGUAL
+      // ✅ ESPACIOS TAL CUAL
       let mensaje = `⚠️ ALERTA DE VENCIMIENTO — ${fechaFormateada}
 
 `;
