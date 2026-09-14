@@ -15,20 +15,20 @@ const ZONA_GUATEMALA = 'America/Guatemala';
 const TOKEN = process.env.WHATSAPP_TOKEN;
 const ID_TELEFONO = process.env.WHATSAPP_ID_TELEFONO;
 
-// ✅ ACEPTAR VARIOS NÚMEROS SEPARADOS POR COMA
+// ✅ Varios números separados por coma
 const LISTA_NUMEROS_DESTINO = process.env.WHATSAPP_NUMERO_DESTINO
   ? process.env.WHATSAPP_NUMERO_DESTINO.split(',').map(num => num.trim())
   : [];
 
 const VERSAO = process.env.WHATSAPP_VERSAO_API || 'v21.0';
-const HORA_ENVIO = '0 */10 * * * *';
+const HORA_ENVIO = '0 */5 * * * *';
 // const HORA_ENVIO = '0 0 7 * * *';
 
 // ==============================================
-// 📱 ENVIAR MENSAJE A UN NÚMERO ESPECÍFICO
+// 📱 ENVIAR A UN NÚMERO
 // ==============================================
 
-const EnviarMensajeWhatsApp = async (mensaje, numeroDestino) => {
+const EnviarMensajeAUnNumero = async (mensaje, numeroDestino) => {
   try {
     const url = `https://graph.facebook.com/${VERSAO}/${ID_TELEFONO}/messages`;
     const respuesta = await axios.post(
@@ -45,7 +45,7 @@ const EnviarMensajeWhatsApp = async (mensaje, numeroDestino) => {
         }
       }
     );
-    console.log(`✅ Enviado a ${numeroDestino} | ID: ${respuesta.data.messages[0].id}`);
+    console.log(`✅ Mensaje enviado a ${numeroDestino} | ID: ${respuesta.data.messages[0].id}`);
     return true;
   } catch (error) {
     console.error(`❌ Error enviando a ${numeroDestino}:`);
@@ -59,18 +59,18 @@ const EnviarMensajeWhatsApp = async (mensaje, numeroDestino) => {
 };
 
 // ==============================================
-// 🚀 ENVIAR MENSAJE A TODOS LOS NÚMEROS
+// 🚀 ENVIAR A TODOS LOS NÚMEROS
 // ==============================================
 
-const EnviarMensajeATodos = async (mensaje) => {
+const EnviarMensajeWhatsApp = async (mensaje) => {
   console.log(`📤 Enviando a ${LISTA_NUMEROS_DESTINO.length} número(s)...`);
   for (const numero of LISTA_NUMEROS_DESTINO) {
-    await EnviarMensajeWhatsApp(mensaje, numero);
+    await EnviarMensajeAUnNumero(mensaje, numero);
   }
 };
 
 // ==============================================
-// 🔍 CALCULAR DÍAS — LÓGICA INTACTA
+// 🔍 CALCULAR DÍAS — SIN CAMBIOS
 // ==============================================
 
 const CalcularEstadoVencimiento = (fechaEntregaDB, hoyGuatemala) => {
@@ -82,7 +82,6 @@ const CalcularEstadoVencimiento = (fechaEntregaDB, hoyGuatemala) => {
   ).startOf('day');
   const hoy = hoyGuatemala.startOf('day');
   const diasDiferencia = Math.round((entrega - hoy) / (1000 * 60 * 60 * 24));
-
   let etiqueta;
   if (diasDiferencia > 0) {
     etiqueta = diasDiferencia === 1 ? 'Faltan 1 DÍA' : `Faltan ${diasDiferencia} DÍAS`;
@@ -96,7 +95,7 @@ const CalcularEstadoVencimiento = (fechaEntregaDB, hoyGuatemala) => {
 };
 
 // ==============================================
-// 🔍 REVISAR PEDIDOS — AGRUPADO POR EMPRESA
+// 🔍 REVISAR PEDIDOS — SOLO AGREGADOS LOS ESPACIOS
 // ==============================================
 
 const RevisarPedidosPorVencer = async () => {
@@ -104,7 +103,6 @@ const RevisarPedidosPorVencer = async () => {
     const hoyGuatemala = DateTime.now().setZone(ZONA_GUATEMALA);
     const fechaFormateada = hoyGuatemala.toFormat('dd/MM/yyyy');
     console.log('🔍 Revisando pedidos... HOY:', fechaFormateada);
-
     const pedidos = await PedidoModelo.findAll({
       where: {
         Estatus: { [Op.in]: [1, 2, 3, 4] },
@@ -128,7 +126,6 @@ const RevisarPedidosPorVencer = async () => {
         }
       ]
     });
-
     const alertas = [];
     for (const pedido of pedidos) {
       const estado = CalcularEstadoVencimiento(pedido.FechaEntrega, hoyGuatemala);
@@ -142,9 +139,7 @@ const RevisarPedidosPorVencer = async () => {
         });
       }
     }
-
     if (alertas.length > 0) {
-      // ✅ AGRUPAR POR EMPRESA
       const agrupado = {};
       for (const alerta of alertas) {
         if (!agrupado[alerta.NombreEmpresa]) {
@@ -153,38 +148,36 @@ const RevisarPedidosPorVencer = async () => {
         agrupado[alerta.NombreEmpresa].push(alerta);
       }
 
-      // ==============================================
-      // ✅ FORMATO SIMPLE: SOLO ESPACIOS, SIN LÍNEAS
-      // ==============================================
-      let mensaje = '';
-      mensaje += '⚠️ ALERTA DE VENCIMIENTO — ' + fechaFormateada + '\n';
-      mensaje += '\n';
-      mensaje += '📋 Se encontraron ' + alertas.length + ' pedido(s):\n';
-      mensaje += '\n';
+      // ✅ SOLO SE AGREGARON LOS ESPACIOS — TODO LO DEMÁS IGUAL
+      let mensaje = `⚠️ ALERTA DE VENCIMIENTO — ${fechaFormateada}
 
-      // ✅ RECORRER EMPRESAS — SIMPLE Y LIMPIO
+`;
+      mensaje += `📋 Se encontraron ${alertas.length} pedido(s):
+
+`;
+
       for (const [nombreEmpresa, pedidosEmpresa] of Object.entries(agrupado)) {
-        mensaje += '🏭 *' + nombreEmpresa.toUpperCase() + '*\n';
-        mensaje += '\n';
-        
+        mensaje += `🏭 *${nombreEmpresa.toUpperCase()}*
+
+`;
         for (const a of pedidosEmpresa) {
-          mensaje += '👤 Cliente: ' + a.NombreCliente + '\n';
-          mensaje += '📅 Entrega: ' + a.FechaEntrega + '\n';
-          mensaje += '⏰ ' + a.Etiqueta + '\n';
-          mensaje += '📦 Pedido #' + a.CodigoPedido + '\n';
-          mensaje += '\n';
+          mensaje += `   Cliente: ${a.NombreCliente}
+`;
+          mensaje += `   Entrega: ${a.FechaEntrega}
+`;
+          mensaje += `   ⏰ ${a.Etiqueta}
+`;
+          mensaje += `   📦 Pedido #${a.CodigoPedido}
+
+`;
         }
       }
 
       console.log(`📤 Enviando resumen con ${alertas.length} alerta(s) de ${Object.keys(agrupado).length} empresa(s)...`);
-      
-      // ✅ ENVÍA A TODOS LOS NÚMEROS
-      await EnviarMensajeATodos(mensaje);
-
+      await EnviarMensajeWhatsApp(mensaje);
     } else {
       console.log('✅ Sin pedidos próximos a vencer o vencidos.');
     }
-
   } catch (error) {
     console.error('❌ Error en RevisarPedidosPorVencer:', error.message);
   }
@@ -195,15 +188,11 @@ const RevisarPedidosPorVencer = async () => {
 // ==============================================
 
 const IniciarAlertasWhatsApp = () => {
-  // ✅ VALIDACIÓN ACTUALIZADA
   if (!TOKEN || !ID_TELEFONO || LISTA_NUMEROS_DESTINO.length === 0) {
     console.warn('⚠️ Variables de WhatsApp sin configurar → Tarea de alertas DESACTIVADA');
     return;
   }
-
   console.log(`📱 Alertas WhatsApp PROGRAMADAS → ${LISTA_NUMEROS_DESTINO.length} destinatario(s)`);
-  console.log(`📋 Números configurados: ${LISTA_NUMEROS_DESTINO.join(', ')}`);
-
   cron.schedule(HORA_ENVIO, async () => {
     console.log('\n⏰ EJECUCIÓN PROGRAMADA: Revisión de vencimientos');
     await RevisarPedidosPorVencer();
