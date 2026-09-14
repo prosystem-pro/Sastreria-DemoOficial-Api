@@ -153,24 +153,26 @@ const RevisarPedidosPorVencer = async () => {
         agrupado[alerta.NombreEmpresa].push(alerta);
       }
 
-      let mensaje = `⚠️ ALERTA DE VENCIMIENTO — ${fechaFormateada}
-`;
-      mensaje += `📋 Se encontraron ${alertas.length} pedido(s):
-`;
+      // ==============================================
+      // ✅ FORMATO SIMPLE: SOLO ESPACIOS, SIN LÍNEAS
+      // ==============================================
+      let mensaje = '';
+      mensaje += '⚠️ ALERTA DE VENCIMIENTO — ' + fechaFormateada + '\n';
+      mensaje += '\n';
+      mensaje += '📋 Se encontraron ' + alertas.length + ' pedido(s):\n';
+      mensaje += '\n';
 
-      // ✅ RECORRER EMPRESAS
+      // ✅ RECORRER EMPRESAS — SIMPLE Y LIMPIO
       for (const [nombreEmpresa, pedidosEmpresa] of Object.entries(agrupado)) {
-        mensaje += `🏭 *${nombreEmpresa.toUpperCase()}*
-`;
+        mensaje += '🏭 *' + nombreEmpresa.toUpperCase() + '*\n';
+        mensaje += '\n';
+        
         for (const a of pedidosEmpresa) {
-          mensaje += `   Cliente: ${a.NombreCliente}
-`;
-          mensaje += `   Entrega: ${a.FechaEntrega}
-`;
-          mensaje += `   ⏰ ${a.Etiqueta}
-`;
-          mensaje += `   📦 Pedido #${a.CodigoPedido}
-`;
+          mensaje += '👤 Cliente: ' + a.NombreCliente + '\n';
+          mensaje += '📅 Entrega: ' + a.FechaEntrega + '\n';
+          mensaje += '⏰ ' + a.Etiqueta + '\n';
+          mensaje += '📦 Pedido #' + a.CodigoPedido + '\n';
+          mensaje += '\n';
         }
       }
 
