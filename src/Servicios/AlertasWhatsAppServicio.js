@@ -95,7 +95,7 @@ const CalcularEstadoVencimiento = (fechaEntregaDB, hoyGuatemala) => {
 };
 
 // ==============================================
-// 🔍 REVISAR PEDIDOS — ALIAS CORREGIDO: CaEstadoPedido
+// 🔍 REVISAR PEDIDOS — ORDENADOS POR FECHA
 // ==============================================
 
 const RevisarPedidosPorVencer = async () => {
@@ -126,10 +126,9 @@ const RevisarPedidosPorVencer = async () => {
           as: 'AdEmpresa',
           attributes: ['NombreEmpresa']
         },
-        // ✅ ALIAS CORREGIDO: CaEstadoPedido
         {
           model: EstadoPedidoModelo,
-          as: 'CaEstadoPedido', // ← Este es el alias correcto según tu error
+          as: 'CaEstadoPedido',
           attributes: ['NombreEstadoPedido']
         }
       ]
@@ -140,7 +139,7 @@ const RevisarPedidosPorVencer = async () => {
       // ✅ IGNORAR si el estado es "Entregado"
       const nombreEstado = pedido.CaEstadoPedido?.NombreEstadoPedido || '';
       if (nombreEstado.trim().toUpperCase() === 'ENTREGADO') {
-        continue; // ⏭️ Saltar pedidos ya entregados
+        continue;
       }
 
       const estado = CalcularEstadoVencimiento(pedido.FechaEntrega, hoyGuatemala);
@@ -150,7 +149,8 @@ const RevisarPedidosPorVencer = async () => {
           NombreCliente: pedido.CaCliente?.NombreCliente || 'Sin nombre',
           NombreEmpresa: pedido.AdEmpresa?.NombreEmpresa || 'Sastreria Demo Oficial',
           FechaEntrega: FormatoFecha(pedido.FechaEntrega),
-          Etiqueta: estado.etiqueta
+          Etiqueta: estado.etiqueta,
+          diasDiferencia: estado.diasDiferencia // ✅ Guardamos el número para ordenar
         });
       }
     }
@@ -162,6 +162,11 @@ const RevisarPedidosPorVencer = async () => {
           agrupado[alerta.NombreEmpresa] = [];
         }
         agrupado[alerta.NombreEmpresa].push(alerta);
+      }
+
+      // ✅ ORDENAR: VENCIDOS PRIMERO → HOY → 1, 2, 3, 4, 5
+      for (const empresa in agrupado) {
+        agrupado[empresa].sort((a, b) => a.diasDiferencia - b.diasDiferencia);
       }
 
       // ✅ ESPACIOS TAL CUAL
