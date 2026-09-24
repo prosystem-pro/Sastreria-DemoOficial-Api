@@ -275,7 +275,6 @@ const RespaldoPorMes = async (anio, mes) => {
         if (!anio || !mes || mes < 1 || mes > 12) {
             return LanzarError('Debe proporcionar Año y Mes válidos (ej: anio:2025, mes:1)', 400);
         }
-
         const nombreBD = BaseDatos.config.database;
         let sql = '';
         const resumen = {
@@ -285,9 +284,7 @@ const RespaldoPorMes = async (anio, mes) => {
             tablas_transaccionales: 0,
             total_registros: 0
         };
-
         sql += `USE [${nombreBD}]\nGO\n\n`;
-
         const TABLAS_MAESTRAS = [
             'Ad.Empresa', 'Ad.Permiso', 'Ad.PermisoRolRecurso', 'Ad.Recurso', 'Ad.Rol', 'Ad.Usuario',
             'Ca.Abertura', 'Ca.Boton', 'Ca.Categoria', 'Ca.Cliente', 'Ca.Color', 'Ca.EstadoPedido',
@@ -296,7 +293,6 @@ const RespaldoPorMes = async (anio, mes) => {
             'Ca.TipoSolapa', 'Ca.TipoTela',
             'Inv.Inventario'
         ];
-
         const TABLAS_TRANSACCIONALES = [
             {
                 nombre: 'Ad.Pagos',
@@ -305,19 +301,32 @@ const RespaldoPorMes = async (anio, mes) => {
                 filtroFecha: `YEAR(FechaDeposito) = ${anio} AND MONTH(FechaDeposito) = ${mes}`
             },
             {
-                nombre: 'Fn.Pago',
-                esquema: 'Fn',
-                tabla: 'Pago',
-                filtroFecha: `YEAR(FechaPago) = ${anio} AND MONTH(FechaPago) = ${mes}`
-            },
-            {
                 nombre: 'Fn.PagoAplicacion',
                 esquema: 'Fn',
                 tabla: 'PagoAplicacion',
+                // ✅ PASO 1: Directo por CodigoDocumento = CodigoPedido
                 filtroFecha: `EXISTS (
                     SELECT 1 FROM Op.Pedido p 
                     WHERE p.CodigoPedido = [Fn].[PagoAplicacion].CodigoDocumento 
                     AND YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
+                )`
+            },
+            {
+                nombre: 'Fn.Pago',
+                esquema: 'Fn',
+                tabla: 'Pago',
+                // ✅ PASO 2: Solo los pagos que SÓLO tienen aplicaciones en este mes
+                filtroFecha: `EXISTS (
+                    SELECT 1 FROM Fn.PagoAplicacion pa
+                    INNER JOIN Op.Pedido p ON p.CodigoPedido = pa.CodigoDocumento
+                    WHERE pa.CodigoPago = [Fn].[Pago].CodigoPago
+                    AND YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
+                )
+                AND NOT EXISTS (
+                    SELECT 1 FROM Fn.PagoAplicacion pa
+                    INNER JOIN Op.Pedido p ON p.CodigoPedido = pa.CodigoDocumento
+                    WHERE pa.CodigoPago = [Fn].[Pago].CodigoPago
+                    AND NOT (YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes})
                 )`
             },
             {
@@ -354,7 +363,6 @@ const RespaldoPorMes = async (anio, mes) => {
                 )`
             }
         ];
-
         for (const nombreCompleto of TABLAS_MAESTRAS) {
             const [Esquema, Tabla] = nombreCompleto.split('.');
             const columnas = await BaseDatos.query(`
@@ -363,16 +371,12 @@ const RespaldoPorMes = async (anio, mes) => {
                 WHERE TABLE_SCHEMA = '${Esquema}' AND TABLE_NAME = '${Tabla}'
                 ORDER BY ORDINAL_POSITION
             `, { type: Sequelize.QueryTypes.SELECT });
-
             const tieneIdentity = columnas.some(c => c.EsIdentity === 1);
             const registros = await BaseDatos.query(`SELECT * FROM [${Esquema}].[${Tabla}]`, { type: Sequelize.QueryTypes.SELECT });
-
             if (registros.length === 0) continue;
-
             resumen.tablas_maestras++;
             resumen.total_registros += registros.length;
             const nombresCols = columnas.map(c => `[${c.COLUMN_NAME}]`).join(', ');
-
             if (tieneIdentity) sql += `SET IDENTITY_INSERT [${Esquema}].[${Tabla}] ON;\n`;
             for (let i = 0; i < registros.length; i += 100) {
                 const lote = registros.slice(i, i + 100);
@@ -382,7 +386,6 @@ const RespaldoPorMes = async (anio, mes) => {
             if (tieneIdentity) sql += `SET IDENTITY_INSERT [${Esquema}].[${Tabla}] OFF;\n`;
             sql += `GO\n\n`;
         }
-
         for (const tablaTrans of TABLAS_TRANSACCIONALES) {
             const { esquema, tabla, filtroFecha } = tablaTrans;
             const columnas = await BaseDatos.query(`
@@ -391,18 +394,14 @@ const RespaldoPorMes = async (anio, mes) => {
                 WHERE TABLE_SCHEMA = '${esquema}' AND TABLE_NAME = '${tabla}'
                 ORDER BY ORDINAL_POSITION
             `, { type: Sequelize.QueryTypes.SELECT });
-
             const tieneIdentity = columnas.some(c => c.EsIdentity === 1);
             const registros = await BaseDatos.query(`
                 SELECT * FROM [${esquema}].[${tabla}] WHERE ${filtroFecha}
             `, { type: Sequelize.QueryTypes.SELECT });
-
             if (registros.length === 0) continue;
-
             resumen.tablas_transaccionales++;
             resumen.total_registros += registros.length;
             const nombresCols = columnas.map(c => `[${c.COLUMN_NAME}]`).join(', ');
-
             if (tieneIdentity) sql += `SET IDENTITY_INSERT [${esquema}].[${tabla}] ON;\n`;
             for (let i = 0; i < registros.length; i += 100) {
                 const lote = registros.slice(i, i + 100);
@@ -412,12 +411,9 @@ const RespaldoPorMes = async (anio, mes) => {
             if (tieneIdentity) sql += `SET IDENTITY_INSERT [${esquema}].[${tabla}] OFF;\n`;
             sql += `GO\n\n`;
         }
-
         const nombreMesLargo = DateTime.fromObject({ year: anio, month: mes }).setZone('America/Guatemala').toFormat('MMMM');
         const nombreArchivo = `${process.env.NOMBRE_EMPRESA || 'EMPRESA'} - Respaldo Mensual - ${anio}-${mes.toString().padStart(2, '0')} (${nombreMesLargo}) - ${DateTime.now().setZone('America/Guatemala').toFormat('yyyy-MM-dd HH.mm')}.sql`;
-
         return { contenidoSQL: sql, nombreArchivo, resumen };
-
     } catch (error) {
         throw error;
     }
@@ -428,11 +424,11 @@ const BorrarDatosPorMes = async (anio, mes) => {
         if (!anio || !mes || mes < 1 || mes > 12) {
             return LanzarError('Año y Mes inválidos para borrar', 400);
         }
-
         const conexion = await BaseDatos.connectionManager.getConnection();
         const { Request } = require('tedious');
         let registrosBorrados = 0;
-
+        
+        // ⚠️ ORDEN DEFINITIVO: Hijos primero → Padre al final
         const ORDEN_BORRADO = [
             {
                 nombre: 'Op.PedidoDetalleMedida',
@@ -453,6 +449,7 @@ const BorrarDatosPorMes = async (anio, mes) => {
                     WHERE YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
                 `
             },
+            // ✅ PASO 1: Borro las aplicaciones del mes
             {
                 nombre: 'Fn.PagoAplicacion',
                 query: `
@@ -462,13 +459,21 @@ const BorrarDatosPorMes = async (anio, mes) => {
                     WHERE YEAR(p.FechaCreacion) = ${anio} AND MONTH(p.FechaCreacion) = ${mes}
                 `
             },
+            // ✅ PASO 2: Borro SOLO los pagos que ya NO tienen ninguna aplicación restante
+            {
+                nombre: 'Fn.Pago',
+                query: `
+                    DELETE fp
+                    FROM Fn.Pago fp
+                    WHERE NOT EXISTS (
+                        SELECT 1 FROM Fn.PagoAplicacion pa
+                        WHERE pa.CodigoPago = fp.CodigoPago
+                    )
+                `
+            },
             {
                 nombre: 'Inv.MovimientoInventario',
                 query: `DELETE FROM Inv.MovimientoInventario WHERE YEAR(FechaMovimiento) = ${anio} AND MONTH(FechaMovimiento) = ${mes}`
-            },
-            {
-                nombre: 'Fn.Pago',
-                query: `DELETE FROM Fn.Pago WHERE YEAR(FechaPago) = ${anio} AND MONTH(FechaPago) = ${mes}`
             },
             {
                 nombre: 'Ad.Pagos',
@@ -494,16 +499,15 @@ const BorrarDatosPorMes = async (anio, mes) => {
         }
 
         BaseDatos.connectionManager.releaseConnection(conexion);
-
+        
         if (registrosBorrados === 0) {
             throw new Error(`No se encontraron registros para borrar en ${mes}/${anio}`);
         }
-
+        
         return {
             mensaje: `✅ Borrado completado. Total registros eliminados: ${registrosBorrados}`,
             registrosBorrados
         };
-
     } catch (error) {
         throw error;
     }

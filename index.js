@@ -61,7 +61,11 @@ const EvaluarYProcesarMesAntiguo = async () => {
   }
 };
 
+// ANTES (a las 4:00 AM todos los días):
 cron.schedule('0 4 * * *', async () => {
+
+  // ✅ AHORA (cada 1 minuto):
+  // cron.schedule('* * * * *', async () => {
   try {
     const { contenidoSQL, nombreArchivo, resumen } = await ServicioBackup.RespaldoCompleto();
     const archivoSubido = await ServicioDrive.SubirArchivoRespaldo(nombreArchivo, contenidoSQL);

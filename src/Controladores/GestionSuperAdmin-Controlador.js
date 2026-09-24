@@ -9,7 +9,6 @@ const LimpiarBaseDatosReplicaCliente = async (req, res) => {
   try {
     const { SuperAdmin } = req.Datos;
 
-    // 🔒 Seguridad fuerte
     if (!SuperAdmin) {
       LanzarError('No autorizado para ejecutar limpieza de base de datos', 403);
     }
@@ -27,7 +26,7 @@ const LimpiarBaseDatosReplicaCliente = async (req, res) => {
   }
 };
 
-// 1. LIMPIEZA TOTAL DE REGISTROS (✅ SOLO LLAMA, NO TIENE CÓDIGO DE BD)
+// 1. LIMPIEZA TOTAL DE REGISTROS
 const LimpiarSoloRegistrosTotal = async (req, res) => {
   try {
     const { SuperAdmin } = req.Datos;
