@@ -24,7 +24,7 @@ const NOMBRE_PLANTILLA_CIERRE  = 'alerta_cierre';
 
 // ⏰ Tiempo de envío
 // const HORA_ENVIO = '0 0 */3 * * *';  // Producción: cada 3 días
-const HORA_ENVIO = '*/10 * * * *';       // Pruebas: cada 5 minutos
+const HORA_ENVIO = '*/1 * * * *';       // Pruebas: cada 5 minutos
 
 const Sanitizar = (texto) => texto ? String(texto).replace(/[\r\n\t]+/g, ' ').trim() : '';
 
