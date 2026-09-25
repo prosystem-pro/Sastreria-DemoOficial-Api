@@ -89,7 +89,7 @@ let ipLocal = 'localhost';
 for (const iface of Object.values(networkInterfaces).flat()) {
   if (iface.family === 'IPv4' && !iface.internal) ipLocal = iface.address;
 }
-IniciarAlertasWhatsApp();
+// IniciarAlertasWhatsApp();
 App.listen(PORT, '0.0.0.0', () => {
   console.log(`🚀 Servidor corriendo en: http://localhost:${PORT}/api`);
   console.log(`🚀 Servidor corriendo en: http://${ipLocal}:${PORT}/api`);
